@@ -4,8 +4,12 @@ import { getAuth, saveAuth } from '@/utils/storage';
 
 const DEFAULT_HEADERS: Record<string, string> = {
   'Accept': 'application/json',
+  'Accept-Language': 'zh-CN',
+  'App-OS': 'ios',
+  'App-OS-Version': '15.1',
   'App-Version': '7.13.3',
   'User-Agent': 'PixivIOSApp/7.13.3 (iOS 15.1; iPhone13,2)',
+  'Referer': 'https://app-api.pixiv.net/',
 };
 
 let isRefreshing = false;
@@ -17,7 +21,7 @@ async function doRefreshToken(): Promise<string> {
 
   const response = await fetch('https://oauth.secure.pixiv.net/auth/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { ...DEFAULT_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: auth.refreshToken,

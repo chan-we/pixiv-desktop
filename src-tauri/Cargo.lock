@@ -2657,6 +2657,7 @@ dependencies = [
 name = "pixiv-desktop"
 version = "0.1.0-alpha.5"
 dependencies = [
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ImageViewer } from '@/components/image/ImageViewer';
 import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
+import { proxyImageUrl } from '@/utils/image';
 
 export function ImageDetail() {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +57,7 @@ export function ImageDetail() {
 
       {/* Image */}
       <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <ImageViewer src={currentImageUrl} alt={illust.title} />
+        <ImageViewer src={proxyImageUrl(currentImageUrl)} alt={illust.title} />
       </div>
 
       {/* Pager */}
@@ -71,7 +72,7 @@ export function ImageDetail() {
         <h1 className="text-white font-medium text-lg mb-2">{illust.title}</h1>
         <div className="flex items-center gap-3">
           <img
-            src={illust.user.profile_image_urls.medium}
+            src={proxyImageUrl(illust.user.profile_image_urls.medium)}
             alt={illust.user.name}
             className="w-8 h-8 rounded-full"
           />

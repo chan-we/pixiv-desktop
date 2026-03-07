@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { getVersion } from '@tauri-apps/api/app';
+import { proxyImageUrl } from '@/utils/image';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export function Settings() {
         {user ? (
           <div className="flex items-center gap-4">
             <img
-              src={user.profile_image_urls.medium}
+              src={proxyImageUrl(user.profile_image_urls.medium)}
               alt={user.name}
               className="w-16 h-16 rounded-full"
             />

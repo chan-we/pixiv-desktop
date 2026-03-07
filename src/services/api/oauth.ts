@@ -8,15 +8,21 @@ import {
 } from '@/utils/constants';
 import type { AccessTokenResponse } from '@/types';
 
+const AUTH_HEADERS: Record<string, string> = {
+  'Content-Type': 'application/x-www-form-urlencoded',
+  'User-Agent': 'PixivIOSApp/7.13.3 (iOS 15.1; iPhone13,2)',
+  'App-OS': 'ios',
+  'App-OS-Version': '15.1',
+  'App-Version': '7.13.3',
+};
+
 export async function getAccessToken(
   code: string,
   codeVerifier: string
 ): Promise<AccessTokenResponse> {
   const response = await fetch(PIXIV_AUTH_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: AUTH_HEADERS,
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -40,9 +46,7 @@ export async function refreshAccessToken(
 ): Promise<AccessTokenResponse> {
   const response = await fetch(PIXIV_AUTH_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: AUTH_HEADERS,
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,

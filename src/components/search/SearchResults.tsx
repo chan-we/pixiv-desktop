@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Illust } from '@/types';
+import { proxyImageUrl } from '@/utils/image';
 
 interface SearchResultsProps {
   illusts: Illust[];
@@ -38,7 +39,7 @@ export function SearchResults({ illusts, isLoading, hasMore, onLoadMore }: Searc
             className="group block relative overflow-hidden rounded-lg aspect-square bg-gray-800"
           >
             <img
-              src={illust.image_urls.square_medium}
+              src={proxyImageUrl(illust.image_urls.square_medium)}
               alt={illust.title}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"

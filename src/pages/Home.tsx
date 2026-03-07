@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { pixivApi } from '@/services/api/pixiv';
+import { proxyImageUrl } from '@/utils/image';
 
 type RankingMode = 'day' | 'week' | 'month' | 'day_male' | 'day_female' | 'week_original' | 'week_rookie';
 
@@ -61,7 +62,7 @@ export function Home() {
               className="group block relative overflow-hidden rounded-lg aspect-square bg-gray-800"
             >
               <img
-                src={illust.image_urls.square_medium}
+                src={proxyImageUrl(illust.image_urls.square_medium)}
                 alt={illust.title}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
