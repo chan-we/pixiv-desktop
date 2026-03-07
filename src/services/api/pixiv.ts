@@ -21,6 +21,11 @@ export const pixivApi = {
     } = {}
   ) => {
     const word = options.r18 ? `${keyword} ${options.r18}` : keyword;
+    const usePopularPreview = options.sort === 'popular_desc';
+    const endpoint = usePopularPreview
+      ? '/v1/search/popular-preview/illust'
+      : '/v1/search/illust';
+
     const params = new URLSearchParams({
       word,
       search_ai_type: '0',
@@ -31,22 +36,12 @@ export const pixivApi = {
 
     if (options.page) params.append('offset', String((options.page - 1) * (options.limit || 30)));
     if (options.limit) params.append('limit', String(options.limit));
-    if (options.sort) params.append('sort', options.sort);
+    if (!usePopularPreview && options.sort) params.append('sort', options.sort);
     if (options.searchTarget) params.append('search_target', options.searchTarget);
 
     const response = await httpClient.get<SearchIllustResponse>(
-      `/v1/search/illust?${params.toString()}`,
+      `${endpoint}?${params.toString()}`,
       { signal: options.signal }
-    );
-    return response.data;
-  },
-
-  // 热门预览搜索
-  popularPreviewIllust: async (keyword: string) => {
-    const response = await httpClient.get<SearchIllustResponse>(
-      `/v1/search/popular-preview/illust?word=${encodeURIComponent(
-        keyword
-      )}&search_ai_type=0&filter=for_ios&include_translated_tag_names=true`
     );
     return response.data;
   },
