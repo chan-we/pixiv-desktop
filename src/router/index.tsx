@@ -7,6 +7,7 @@ import { Search as SearchPage } from '@/pages/Search';
 import { ImageDetail } from '@/pages/ImageDetail';
 import { Settings as SettingsPage } from '@/pages/Settings';
 import { Profile } from '@/pages/Profile';
+import { UserProfile } from '@/pages/UserProfile';
 import { DownloadPanel } from '@/components/download/DownloadPanel';
 import { useDownloadStore } from '@/stores/downloadStore';
 
@@ -107,6 +108,10 @@ const router = createBrowserRouter([
       {
         path: 'profile',
         element: <Profile />,
+      },
+      {
+        path: 'user/:id',
+        element: <UserProfile />,
       },
       {
         path: 'settings',

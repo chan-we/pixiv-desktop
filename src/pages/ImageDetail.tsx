@@ -243,14 +243,17 @@ export function ImageDetail() {
       {/* Info Panel */}
       <div className="bg-gray-900/90 backdrop-blur-sm p-4">
         <h1 className="text-white font-medium text-lg mb-2">{illust.title}</h1>
-        <div className="flex items-center gap-3">
+        <Link
+          to={`/user/${illust.user.id}`}
+          className="flex items-center gap-3 group"
+        >
           <img
             src={proxyImageUrl(illust.user.profile_image_urls.medium)}
             alt={illust.user.name}
-            className="w-8 h-8 rounded-full"
+            className="w-8 h-8 rounded-full group-hover:ring-2 ring-blue-500 transition-all"
           />
-          <span className="text-gray-300">{illust.user.name}</span>
-        </div>
+          <span className="text-gray-300 group-hover:text-white transition-colors">{illust.user.name}</span>
+        </Link>
         <div className="flex flex-wrap gap-2 mt-3">
           {illust.tags.map((tag) => (
             <Link
