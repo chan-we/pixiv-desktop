@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LogIn, Copy, ExternalLink } from 'lucide-react';
 import { generateCodeVerifier, generateCodeChallenge } from '@/utils/pkce';
 import { getAuthorizeUrl } from '@/services/api/oauth';
 import { useAuthStore } from '@/stores/authStore';
@@ -111,14 +112,18 @@ export function Login() {
 
         <button
           onClick={handleAuthorize}
-          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors"
+          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors flex items-center justify-center gap-2"
         >
+          <LogIn className="w-5 h-5" />
           Login with Pixiv
         </button>
 
         {authUrl && (
           <div className="mt-4 p-4 bg-gray-700 rounded-lg">
-            <p className="text-gray-300 text-sm mb-2">If browser didn't open, copy URL:</p>
+            <p className="text-gray-300 text-sm mb-2 flex items-center gap-1.5">
+              <ExternalLink className="w-4 h-4" />
+              If browser didn't open, copy URL:
+            </p>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -128,8 +133,9 @@ export function Login() {
               />
               <button
                 onClick={copyToClipboard}
-                className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded"
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded flex items-center gap-1.5"
               >
+                <Copy className="w-4 h-4" />
                 Copy
               </button>
             </div>

@@ -1,10 +1,11 @@
 import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
+import { Home as HomeIcon, Search, Settings } from 'lucide-react';
 import { getAuth } from '@/utils/storage';
 import { Login } from '@/pages/Login';
 import { Home } from '@/pages/Home';
-import { Search } from '@/pages/Search';
+import { Search as SearchPage } from '@/pages/Search';
 import { ImageDetail } from '@/pages/ImageDetail';
-import { Settings } from '@/pages/Settings';
+import { Settings as SettingsPage } from '@/pages/Settings';
 
 function checkAuth() {
   const auth = getAuth();
@@ -26,10 +27,19 @@ function Layout() {
     <div className="min-h-screen bg-gray-900">
       <nav className="bg-gray-800 border-b border-gray-700">
         <div className="flex items-center justify-between px-4 py-3">
-          <a href="/" className="text-xl font-bold text-white">Pixiv</a>
+          <a href="/" className="flex items-center gap-2 text-xl font-bold text-white">
+            <HomeIcon className="w-5 h-5" />
+            Pixiv
+          </a>
           <div className="flex items-center gap-4">
-            <a href="/search" className="text-gray-300 hover:text-white transition-colors">Search</a>
-            <a href="/settings" className="text-gray-300 hover:text-white transition-colors">Settings</a>
+            <a href="/search" className="flex items-center gap-1.5 text-gray-300 hover:text-white transition-colors">
+              <Search className="w-4 h-4" />
+              Search
+            </a>
+            <a href="/settings" className="flex items-center gap-1.5 text-gray-300 hover:text-white transition-colors">
+              <Settings className="w-4 h-4" />
+              Settings
+            </a>
           </div>
         </div>
       </nav>
@@ -60,7 +70,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'search',
-        element: <Search />,
+        element: <SearchPage />,
       },
       {
         path: 'image/:id',
@@ -68,7 +78,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <Settings />,
+        element: <SettingsPage />,
       },
     ],
   },

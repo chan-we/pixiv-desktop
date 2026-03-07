@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { Loader2, Images } from 'lucide-react';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
 
@@ -48,10 +49,7 @@ export function Home() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <svg className="animate-spin h-8 w-8 text-blue-500" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
+          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -75,8 +73,9 @@ export function Home() {
                 </div>
               </div>
               {illust.page_count > 1 && (
-                <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                  {illust.page_count}P
+                <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                  <Images className="w-3 h-3" />
+                  {illust.page_count}
                 </div>
               )}
             </Link>

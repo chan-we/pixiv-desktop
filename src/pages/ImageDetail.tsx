@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
 import { ImageViewer } from '@/components/image/ImageViewer';
 import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
@@ -16,22 +17,43 @@ export function ImageDetail() {
     enabled: !!id,
   });
 
+  const pages = illust
+    ? illust.meta_pages.length > 0
+      ? illust.meta_pages
+      : [{ image_urls: { large: illust.meta_single_page.original_image_url || illust.image_urls.large, square_medium: illust.image_urls.square_medium } }]
+    : [];
+
+  const goToPrev = useCallback(() => {
+    setCurrentPage((p) => Math.max(0, p - 1));
+  }, []);
+
+  const goToNext = useCallback(() => {
+    setCurrentPage((p) => Math.min(pages.length - 1, p + 1));
+  }, [pages.length]);
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [id]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goToPrev();
+      else if (e.key === 'ArrowRight') goToNext();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToPrev, goToNext]);
+
   if (isLoading || !illust) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <svg className="animate-spin h-8 w-8 text-blue-500" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
+        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
       </div>
     );
   }
 
-  const pages = illust.meta_pages.length > 0
-    ? illust.meta_pages
-    : [{ image_urls: { large: illust.meta_single_page.original_image_url || illust.image_urls.large } }];
-
   const currentImageUrl = pages[currentPage]?.image_urls.large || illust.image_urls.large;
+  const isMultiPage = pages.length > 1;
 
   return (
     <div className="h-screen bg-black flex flex-col">
@@ -41,26 +63,76 @@ export function ImageDetail() {
           to="/"
           className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
+          <ArrowLeft className="w-5 h-5" />
           Back
         </Link>
         <div className="flex items-center gap-2">
+          {isMultiPage && (
+            <span className="text-gray-400 text-sm">
+              {currentPage + 1} / {pages.length}
+            </span>
+          )}
           <button className="p-2 text-gray-300 hover:text-white transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <Download className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Image */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <ImageViewer src={proxyImageUrl(currentImageUrl)} alt={illust.title} />
+      {/* Image — key forces zoom reset on page change */}
+      <div className="flex-1 flex items-center justify-center overflow-hidden relative">
+        <ImageViewer
+          key={`${id}-${currentPage}`}
+          src={proxyImageUrl(currentImageUrl)}
+          alt={`${illust.title} - ${currentPage + 1}`}
+        />
+
+        {isMultiPage && (
+          <>
+            {currentPage > 0 && (
+              <button
+                onClick={goToPrev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            {currentPage < pages.length - 1 && (
+              <button
+                onClick={goToNext}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors rotate-180"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Pager */}
+      {/* Thumbnail strip */}
+      {isMultiPage && (
+        <div className="bg-gray-900/90 border-t border-gray-800 px-2 py-2">
+          <div className="flex gap-1.5 overflow-x-auto justify-center">
+            {pages.map((page, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i)}
+                className={`flex-shrink-0 w-14 h-14 rounded overflow-hidden border-2 transition-colors ${
+                  i === currentPage ? 'border-blue-500' : 'border-transparent hover:border-gray-500'
+                }`}
+              >
+                <img
+                  src={proxyImageUrl(page.image_urls.square_medium || page.image_urls.large)}
+                  alt={`Page ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom pager (keyboard hint) */}
       <ImagePager
         total={pages.length}
         current={currentPage}
@@ -89,8 +161,8 @@ export function ImageDetail() {
           ))}
         </div>
         <div className="flex gap-4 mt-3 text-gray-400 text-sm">
-          <span>👁 {illust.total_view.toLocaleString()}</span>
-          <span>❤️ {illust.total_bookmarks.toLocaleString()}</span>
+          <span className="flex items-center gap-1"><Eye className="w-4 h-4" /> {illust.total_view.toLocaleString()}</span>
+          <span className="flex items-center gap-1"><Heart className="w-4 h-4" /> {illust.total_bookmarks.toLocaleString()}</span>
         </div>
       </div>
     </div>

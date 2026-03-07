@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { User, LogOut, Info, LogIn } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { getVersion } from '@tauri-apps/api/app';
 import { proxyImageUrl } from '@/utils/image';
@@ -23,7 +24,10 @@ export function Settings() {
       <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
       <div className="bg-gray-800 rounded-lg p-4 mb-4">
-        <h2 className="text-lg font-medium text-white mb-4">Account</h2>
+        <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <User className="w-5 h-5" />
+          Account
+        </h2>
         {user ? (
           <div className="flex items-center gap-4">
             <img
@@ -41,8 +45,9 @@ export function Settings() {
             <p className="text-gray-400 mb-4">Not logged in</p>
             <button
               onClick={() => navigate('/login')}
-              className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
+              <LogIn className="w-4 h-4" />
               Login
             </button>
           </div>
@@ -52,14 +57,18 @@ export function Settings() {
       {user && (
         <button
           onClick={handleLogout}
-          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
         >
+          <LogOut className="w-5 h-5" />
           Logout
         </button>
       )}
 
       <div className="bg-gray-800 rounded-lg p-4 mt-4">
-        <h2 className="text-lg font-medium text-white mb-2">About</h2>
+        <h2 className="text-lg font-medium text-white mb-2 flex items-center gap-2">
+          <Info className="w-5 h-5" />
+          About
+        </h2>
         <p className="text-gray-400 text-sm">Pixiv Desktop {version && `v${version}`}</p>
       </div>
     </div>

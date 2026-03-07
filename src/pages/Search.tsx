@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Clock } from 'lucide-react';
 import { SearchInput } from '@/components/search/SearchInput';
 import { SearchResults } from '@/components/search/SearchResults';
 import { pixivApi } from '@/services/api/pixiv';
@@ -53,7 +54,10 @@ export function Search() {
 
       {!keyword && history.length > 0 && (
         <div>
-          <h3 className="text-lg font-medium text-white mb-4">Recent Searches</h3>
+          <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Recent Searches
+          </h3>
           <div className="flex flex-wrap gap-2">
             {history.slice(0, 10).map((item, index) => (
               <button
