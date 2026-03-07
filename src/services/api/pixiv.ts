@@ -14,15 +14,18 @@ export const pixivApi = {
     options: {
       page?: number;
       limit?: number;
-      sort?: 'date' | 'popular';
+      sort?: 'date_desc' | 'date_asc' | 'popular_desc';
       searchTarget?: 'partial_match_for_tags' | 'exact_match_for_tags' | 'title_and_caption';
+      r18?: '' | '-R-18' | 'R-18';
     } = {}
   ) => {
+    const word = options.r18 ? `${keyword} ${options.r18}` : keyword;
     const params = new URLSearchParams({
-      word: keyword,
+      word,
       search_ai_type: '0',
       filter: 'for_ios',
       include_translated_tag_names: 'true',
+      merge_plain_keyword_results: 'true',
     });
 
     if (options.page) params.append('offset', String((options.page - 1) * (options.limit || 30)));

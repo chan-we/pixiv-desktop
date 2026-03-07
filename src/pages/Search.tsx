@@ -1,35 +1,41 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock } from 'lucide-react';
 import { SearchInput } from '@/components/search/SearchInput';
 import { SearchResults } from '@/components/search/SearchResults';
+import {
+  SearchFilterDrawer,
+  defaultFilters,
+  type SearchFilters,
+} from '@/components/search/SearchFilterDrawer';
 import { pixivApi } from '@/services/api/pixiv';
-import { addSearchHistory, getSearchHistory, getSearchHistoryEnabled } from '@/utils/storage';
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
-  const [history, setHistory] = useState<string[]>([]);
-  const historyEnabled = getSearchHistoryEnabled();
+  const [filters, setFilters] = useState<SearchFilters>({ ...defaultFilters });
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  useEffect(() => {
-    if (historyEnabled) {
-      setHistory(getSearchHistory());
-    }
-  }, [historyEnabled, keyword]);
+  const hasActiveFilters =
+    filters.searchTarget !== defaultFilters.searchTarget ||
+    filters.sort !== defaultFilters.sort ||
+    filters.r18 !== defaultFilters.r18;
 
   useEffect(() => {
     const q = searchParams.get('q') || '';
     if (q && q !== keyword) {
       setKeyword(q);
-      addSearchHistory(q);
     }
   }, [searchParams]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['search', keyword],
-    queryFn: () => pixivApi.searchIllust(keyword),
+    queryKey: ['search', keyword, filters],
+    queryFn: () =>
+      pixivApi.searchIllust(keyword, {
+        sort: filters.sort,
+        searchTarget: filters.searchTarget,
+        r18: filters.r18 || undefined,
+      }),
     enabled: keyword.length > 0,
   });
 
@@ -44,7 +50,6 @@ export function Search() {
   const handleSearch = useCallback((newKeyword: string) => {
     setKeyword(newKeyword);
     setSearchParams({ q: newKeyword });
-    addSearchHistory(newKeyword);
   }, [setSearchParams]);
 
   return (
@@ -55,8 +60,9 @@ export function Search() {
           onChange={setKeyword}
           onSearch={handleSearch}
           suggestions={suggestions}
-          history={historyEnabled ? history : []}
           placeholder="Search illusts..."
+          hasActiveFilters={hasActiveFilters}
+          onFilterClick={() => setFilterOpen(true)}
         />
       </div>
 
@@ -69,25 +75,12 @@ export function Search() {
         />
       )}
 
-      {!keyword && historyEnabled && history.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            Recent Searches
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {history.slice(0, 10).map((item, index) => (
-              <button
-                key={index}
-                onClick={() => handleSearch(item)}
-                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-full text-sm transition-colors"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <SearchFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
     </div>
   );
 }

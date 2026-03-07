@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 
 interface SearchInputProps {
   value: string;
@@ -7,6 +7,8 @@ interface SearchInputProps {
   onSearch: (keyword: string) => void;
   suggestions?: string[];
   placeholder?: string;
+  hasActiveFilters?: boolean;
+  onFilterClick?: () => void;
 }
 
 export function SearchInput({
@@ -15,6 +17,8 @@ export function SearchInput({
   onSearch,
   suggestions = [],
   placeholder = 'Search...',
+  hasActiveFilters = false,
+  onFilterClick,
 }: SearchInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +62,18 @@ export function SearchInput({
         >
           Search
         </button>
+        {onFilterClick && (
+          <button
+            type="button"
+            onClick={onFilterClick}
+            className="relative p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+            {hasActiveFilters && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+            )}
+          </button>
+        )}
       </form>
 
       {showSuggestions && suggestions.length > 0 && (

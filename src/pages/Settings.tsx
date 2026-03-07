@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Info, LogIn, Search, Trash2 } from 'lucide-react';
+import { User, LogOut, Info, LogIn } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { getVersion } from '@tauri-apps/api/app';
 import { proxyImageUrl } from '@/utils/image';
-import { getSettings, saveSettings, clearSearchHistory, getSearchHistory } from '@/utils/storage';
 
 export function Settings() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [version, setVersion] = useState('');
-  const [searchHistoryEnabled, setSearchHistoryEnabled] = useState(getSettings().searchHistoryEnabled);
-  const [historyCount, setHistoryCount] = useState(getSearchHistory().length);
 
   useEffect(() => {
     getVersion().then(setVersion);
@@ -66,42 +63,6 @@ export function Settings() {
           Logout
         </button>
       )}
-
-      <div className="bg-gray-800 rounded-lg p-4 mt-4">
-        <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-          <Search className="w-5 h-5" />
-          Search
-        </h2>
-        <div className="flex items-center justify-between py-2">
-          <span className="text-gray-300">Search History</span>
-          <button
-            onClick={() => {
-              const next = !searchHistoryEnabled;
-              setSearchHistoryEnabled(next);
-              saveSettings({ searchHistoryEnabled: next });
-              if (!next) {
-                clearSearchHistory();
-                setHistoryCount(0);
-              }
-            }}
-            className={`relative w-11 h-6 rounded-full transition-colors ${searchHistoryEnabled ? 'bg-blue-600' : 'bg-gray-600'}`}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${searchHistoryEnabled ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
-        {searchHistoryEnabled && historyCount > 0 && (
-          <button
-            onClick={() => {
-              clearSearchHistory();
-              setHistoryCount(0);
-            }}
-            className="mt-2 flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear search history ({historyCount})
-          </button>
-        )}
-      </div>
 
       <div className="bg-gray-800 rounded-lg p-4 mt-4">
         <h2 className="text-lg font-medium text-white mb-2 flex items-center gap-2">
