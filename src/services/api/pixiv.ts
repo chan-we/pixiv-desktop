@@ -115,21 +115,32 @@ export const pixivApi = {
     return response.data;
   },
 
+  // 获取用户收藏
+  getUserBookmarks: async (userId: number, restrict: 'public' | 'private' = 'public', page = 1) => {
+    const response = await httpClient.get<SearchIllustResponse>(
+      `/v1/user/bookmarks/illust?user_id=${userId}&restrict=${restrict}&filter=for_ios&offset=${
+        (page - 1) * 30
+      }`
+    );
+    return response.data;
+  },
+
   // 收藏作品
-  addBookmark: async (illustId: number, tags: string[] = []) => {
-    const response = await httpClient.post('/v2/illust/bookmark/add', {
-      illust_id: illustId,
-      restrict: 'public',
-      tags,
+  addBookmark: async (illustId: number, restrict: 'public' | 'private' = 'public') => {
+    const body = new URLSearchParams({
+      illust_id: String(illustId),
+      restrict,
     });
+    const response = await httpClient.post('/v2/illust/bookmark/add', body);
     return response.data;
   },
 
   // 取消收藏
   deleteBookmark: async (illustId: number) => {
-    const response = await httpClient.delete(`/v1/illust/bookmark/delete`, {
-      data: { illust_id: illustId },
+    const body = new URLSearchParams({
+      illust_id: String(illustId),
     });
+    const response = await httpClient.post('/v1/illust/bookmark/delete', body);
     return response.data;
   },
 };

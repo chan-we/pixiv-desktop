@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ImageViewer } from '@/components/image/ImageViewer';
@@ -8,10 +8,12 @@ import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
 import { useDownloadStore } from '@/stores/downloadStore';
+import type { IllustDetail } from '@/types';
 
 export function ImageDetail() {
   const { id } = useParams<{ id: string }>();
   const [currentPage, setCurrentPage] = useState(0);
+  const queryClient = useQueryClient();
 
   const { data: illust, isLoading } = useQuery({
     queryKey: ['illust', id],
@@ -20,6 +22,38 @@ export function ImageDetail() {
   });
 
   const addTasks = useDownloadStore((s) => s.addTasks);
+
+  const bookmarkMutation = useMutation({
+    mutationFn: async (bookmarked: boolean) => {
+      if (bookmarked) {
+        await pixivApi.deleteBookmark(Number(id));
+      } else {
+        await pixivApi.addBookmark(Number(id));
+      }
+    },
+    onMutate: async (bookmarked) => {
+      await queryClient.cancelQueries({ queryKey: ['illust', id] });
+      const previous = queryClient.getQueryData<IllustDetail>(['illust', id]);
+      if (previous) {
+        queryClient.setQueryData<IllustDetail>(['illust', id], {
+          ...previous,
+          is_bookmarked: !bookmarked,
+          total_bookmarks: previous.total_bookmarks + (bookmarked ? -1 : 1),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _bookmarked, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['illust', id], context.previous);
+      }
+    },
+  });
+
+  const handleToggleBookmark = useCallback(() => {
+    if (!illust || bookmarkMutation.isPending) return;
+    bookmarkMutation.mutate(illust.is_bookmarked);
+  }, [illust, bookmarkMutation]);
 
   const pages = illust
     ? illust.meta_pages.length > 0
@@ -120,6 +154,21 @@ export function ImageDetail() {
           Back
         </Link>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleBookmark}
+            disabled={bookmarkMutation.isPending}
+            className={`p-2 transition-colors ${
+              illust.is_bookmarked
+                ? 'text-red-500 hover:text-red-400'
+                : 'text-gray-300 hover:text-red-400'
+            } ${bookmarkMutation.isPending ? 'opacity-50' : ''}`}
+            title={illust.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'}
+          >
+            <Heart
+              className="w-5 h-5"
+              fill={illust.is_bookmarked ? 'currentColor' : 'none'}
+            />
+          </button>
           <button
             onClick={handleDownload}
             className="p-2 text-gray-300 hover:text-white transition-colors"
