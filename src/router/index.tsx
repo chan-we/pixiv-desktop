@@ -1,4 +1,5 @@
-import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createBrowserRouter, Navigate, Outlet, redirect, useLocation } from 'react-router-dom';
 import { Home as HomeIcon, Search, Settings, Download, UserCircle } from 'lucide-react';
 import { getAuth } from '@/utils/storage';
 import { Login } from '@/pages/Login';
@@ -49,6 +50,42 @@ function DownloadNavButton() {
 }
 
 function Layout() {
+  const location = useLocation();
+  const isSearch = location.pathname === '/search';
+  const [searchMounted, setSearchMounted] = useState(false);
+  const searchScrollRef = useRef(0);
+  const wasSearchRef = useRef(isSearch);
+  const prevSearchParamsRef = useRef(isSearch ? location.search : '');
+
+  if (isSearch && !searchMounted) {
+    setSearchMounted(true);
+  }
+
+  useEffect(() => {
+    if (!isSearch) return;
+    const onScroll = () => {
+      searchScrollRef.current = window.scrollY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isSearch]);
+
+  useLayoutEffect(() => {
+    if (wasSearchRef.current && !isSearch) {
+      window.scrollTo(0, 0);
+    } else if (!wasSearchRef.current && isSearch) {
+      if (location.search === prevSearchParamsRef.current && searchScrollRef.current > 0) {
+        window.scrollTo(0, searchScrollRef.current);
+      } else {
+        window.scrollTo(0, 0);
+      }
+    }
+    if (isSearch) {
+      prevSearchParamsRef.current = location.search;
+    }
+    wasSearchRef.current = isSearch;
+  }, [isSearch, location.search]);
+
   return (
     <div className="min-h-screen bg-gray-900">
       <nav className="bg-gray-800 border-b border-gray-700">
@@ -72,7 +109,12 @@ function Layout() {
         </div>
       </nav>
       <main>
-        <Outlet />
+        {searchMounted && (
+          <div style={{ display: isSearch ? undefined : 'none' }}>
+            <SearchPage />
+          </div>
+        )}
+        {!isSearch && <Outlet />}
       </main>
       <DownloadPanel />
     </div>

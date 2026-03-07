@@ -3,19 +3,20 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { SearchInput } from '@/components/search/SearchInput';
 import { SearchResults } from '@/components/search/SearchResults';
+import { ScrollToTop } from '@/components/ScrollToTop';
 import {
   SearchFilterDrawer,
   defaultFilters,
-  type SearchFilters,
 } from '@/components/search/SearchFilterDrawer';
 import { pixivApi } from '@/services/api/pixiv';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useSearchStore } from '@/stores/searchStore';
 import type { SearchIllustResponse } from '@/types';
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
-  const [filters, setFilters] = useState<SearchFilters>({ ...defaultFilters });
+  const { filters, setFilters } = useSearchStore();
   const [filterOpen, setFilterOpen] = useState(false);
 
   const debouncedKeyword = useDebouncedValue(keyword, 300);
@@ -110,6 +111,8 @@ export function Search() {
         filters={filters}
         onFiltersChange={setFilters}
       />
+
+      <ScrollToTop />
     </div>
   );
 }
