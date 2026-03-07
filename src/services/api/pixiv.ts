@@ -17,6 +17,7 @@ export const pixivApi = {
       sort?: 'date_desc' | 'date_asc' | 'popular_desc';
       searchTarget?: 'partial_match_for_tags' | 'exact_match_for_tags' | 'title_and_caption';
       r18?: '' | '-R-18' | 'R-18';
+      signal?: AbortSignal;
     } = {}
   ) => {
     const word = options.r18 ? `${keyword} ${options.r18}` : keyword;
@@ -34,7 +35,8 @@ export const pixivApi = {
     if (options.searchTarget) params.append('search_target', options.searchTarget);
 
     const response = await httpClient.get<SearchIllustResponse>(
-      `/v1/search/illust?${params.toString()}`
+      `/v1/search/illust?${params.toString()}`,
+      { signal: options.signal }
     );
     return response.data;
   },
@@ -72,9 +74,10 @@ export const pixivApi = {
   },
 
   // 获取搜索建议
-  getSearchSuggestions: async (keyword: string) => {
+  getSearchSuggestions: async (keyword: string, signal?: AbortSignal) => {
     const response = await httpClient.get<SearchSuggestionResponse>(
-      `/v2/search/autocomplete?word=${encodeURIComponent(keyword)}`
+      `/v2/search/autocomplete?word=${encodeURIComponent(keyword)}`,
+      { signal }
     );
     return response.data;
   },

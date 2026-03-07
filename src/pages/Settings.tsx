@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { User, LogOut, Info, LogIn } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { pixivApi } from '@/services/api/pixiv';
 import { getVersion } from '@tauri-apps/api/app';
 import { proxyImageUrl } from '@/utils/image';
 
 export function Settings() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user: authUser, logout } = useAuthStore();
   const [version, setVersion] = useState('');
+
+  const { data: userDetail } = useQuery({
+    queryKey: ['userDetail', authUser?.id],
+    queryFn: () => pixivApi.getUserDetail(authUser!.id),
+    enabled: !!authUser?.id,
+  });
+
+  const user = userDetail?.user ?? authUser;
 
   useEffect(() => {
     getVersion().then(setVersion);

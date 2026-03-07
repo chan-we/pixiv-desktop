@@ -58,6 +58,7 @@ interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: string | URLSearchParams | Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 interface HttpResponse<T = unknown> {
@@ -99,6 +100,7 @@ async function request<T = unknown>(
     method: options.method || 'GET',
     headers,
     body: bodyStr,
+    signal: options.signal,
   });
 
   if (response.status === 401 && retry) {
@@ -123,7 +125,7 @@ async function request<T = unknown>(
 }
 
 const httpClient = {
-  get: <T = unknown>(url: string, options?: { headers?: Record<string, string> }) =>
+  get: <T = unknown>(url: string, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
     request<T>(url, { method: 'GET', ...options }),
 
   post: <T = unknown>(url: string, body?: unknown, options?: { headers?: Record<string, string> }) =>
