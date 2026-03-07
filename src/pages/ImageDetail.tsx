@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
@@ -12,6 +12,7 @@ import type { IllustDetail } from '@/types';
 
 export function ImageDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(0);
   const queryClient = useQueryClient();
 
@@ -146,13 +147,12 @@ export function ImageDetail() {
     <div className="h-screen bg-black flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900/80 backdrop-blur-sm">
-        <Link
-          to="/"
+        <button
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back
-        </Link>
+        </button>
         <div className="flex items-center gap-2">
           <button
             onClick={handleToggleBookmark}

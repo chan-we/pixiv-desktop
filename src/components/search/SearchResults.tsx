@@ -1,3 +1,4 @@
+import { useRef, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { Illust } from '@/types';
 import { IllustCard } from '@/components/image/IllustCard';
@@ -5,11 +6,40 @@ import { IllustCard } from '@/components/image/IllustCard';
 interface SearchResultsProps {
   illusts: Illust[];
   isLoading?: boolean;
+  isFetchingNextPage?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
 }
 
-export function SearchResults({ illusts, isLoading, hasMore, onLoadMore }: SearchResultsProps) {
+export function SearchResults({
+  illusts,
+  isLoading,
+  isFetchingNextPage,
+  hasMore,
+  onLoadMore,
+}: SearchResultsProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      if (entries[0]?.isIntersecting && hasMore && !isFetchingNextPage) {
+        onLoadMore?.();
+      }
+    },
+    [hasMore, isFetchingNextPage, onLoadMore]
+  );
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(handleIntersect, {
+      rootMargin: '400px',
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [handleIntersect]);
+
   if (isLoading && illusts.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -34,15 +64,11 @@ export function SearchResults({ illusts, isLoading, hasMore, onLoadMore }: Searc
         ))}
       </div>
 
-      {hasMore && (
-        <div className="flex justify-center mt-6">
-          <button
-            onClick={onLoadMore}
-            disabled={isLoading}
-            className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isLoading ? 'Loading...' : 'Load More'}
-          </button>
+      <div ref={sentinelRef} className="h-1" />
+
+      {isFetchingNextPage && (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
         </div>
       )}
     </div>

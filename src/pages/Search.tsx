@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { SearchInput } from '@/components/search/SearchInput';
 import { SearchResults } from '@/components/search/SearchResults';
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/components/search/SearchFilterDrawer';
 import { pixivApi } from '@/services/api/pixiv';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import type { SearchIllustResponse } from '@/types';
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,17 +38,34 @@ export function Search() {
     [debouncedKeyword, debouncedFilters]
   );
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: searchQueryKey,
-    queryFn: ({ signal }) =>
-      pixivApi.searchIllust(debouncedKeyword, {
+    queryFn: ({ signal, pageParam }) => {
+      if (pageParam) {
+        return pixivApi.fetchNextPage<SearchIllustResponse>(pageParam, signal);
+      }
+      return pixivApi.searchIllust(debouncedKeyword, {
         sort: debouncedFilters.sort,
         searchTarget: debouncedFilters.searchTarget,
         r18: debouncedFilters.r18 || undefined,
         signal,
-      }),
+      });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.next_url ?? undefined,
     enabled: debouncedKeyword.length > 0,
   });
+
+  const allIllusts = useMemo(
+    () => data?.pages.flatMap((page) => page.illusts) ?? [],
+    [data]
+  );
 
   const { data: suggestionsData } = useQuery({
     queryKey: ['suggestions', debouncedKeyword],
@@ -78,10 +96,11 @@ export function Search() {
 
       {keyword && (
         <SearchResults
-          illusts={data?.illusts || []}
+          illusts={allIllusts}
           isLoading={isLoading}
-          hasMore={!!data?.next_url}
-          onLoadMore={() => {}}
+          isFetchingNextPage={isFetchingNextPage}
+          hasMore={!!hasNextPage}
+          onLoadMore={fetchNextPage}
         />
       )}
 

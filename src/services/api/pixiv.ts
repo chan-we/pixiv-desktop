@@ -141,4 +141,9 @@ export const pixivApi = {
     const response = await httpClient.post('/v1/illust/bookmark/delete', body);
     return response.data;
   },
+
+  fetchNextPage: async <T = unknown>(nextUrl: string, signal?: AbortSignal) => {
+    const response = await httpClient.get<T>(nextUrl, { signal });
+    return response.data;
+  },
 };

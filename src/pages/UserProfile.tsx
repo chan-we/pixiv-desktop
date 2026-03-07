@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Image as ImageIcon, BookOpen, ArrowLeft } from 'lucide-react';
 import { pixivApi } from '@/services/api/pixiv';
@@ -9,6 +9,7 @@ import type { Illust } from '@/types';
 
 export function UserProfile() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const userId = Number(id);
   const [tab, setTab] = useState<'illust' | 'manga'>('illust');
 
@@ -42,13 +43,12 @@ export function UserProfile() {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <Link
-        to="/"
+      <button
+        onClick={() => navigate(-1)}
         className="inline-flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back
-      </Link>
+      </button>
 
       {/* Profile header */}
       <div className="flex items-center gap-5 mb-8">
