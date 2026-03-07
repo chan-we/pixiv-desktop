@@ -48,10 +48,10 @@ export const pixivApi = {
 
   // 获取插画详情
   getIllustDetail: async (illustId: number) => {
-    const response = await httpClient.get<IllustDetail>(
+    const response = await httpClient.get<{ illust: IllustDetail }>(
       `/v1/illust/detail?illust_id=${illustId}`
     );
-    return response.data;
+    return response.data.illust;
   },
 
   // 获取排行榜
