@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Success</title>
+  <script>
+    // 获取 URL 中的授权码
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+
+    if (code) {
+      // 将授权码发送给父窗口并关闭当前窗口
+      window.opener.postMessage({ type: 'pixiv-oauth-code', code: code }, '*');
+      document.body.innerHTML = '<h1>Login successful! You can close this window.</h1>';
+      setTimeout(() => window.close(), 2000);
+    } else {
+      document.body.innerHTML = '<h1>Authorization failed. No code received.</h1>';
+    }
+  </script>
+</head>
+<body>
+  <h1>Processing...</h1>
+</body>
+</html>
