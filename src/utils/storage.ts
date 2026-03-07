@@ -49,7 +49,43 @@ export function getSearchHistory(): string[] {
 }
 
 export function addSearchHistory(keyword: string): void {
+  if (!getSearchHistoryEnabled()) return;
   const history = getSearchHistory().filter(k => k !== keyword);
   history.unshift(keyword);
   saveSearchHistory(history);
+}
+
+export function clearSearchHistory(): void {
+  localStorage.removeItem(SEARCH_HISTORY_KEY);
+}
+
+// Settings
+
+const SETTINGS_KEY = 'pixiv_settings';
+
+interface AppSettings {
+  searchHistoryEnabled: boolean;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  searchHistoryEnabled: true,
+};
+
+export function getSettings(): AppSettings {
+  const data = localStorage.getItem(SETTINGS_KEY);
+  if (!data) return DEFAULT_SETTINGS;
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function saveSettings(settings: Partial<AppSettings>): void {
+  const current = getSettings();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+}
+
+export function getSearchHistoryEnabled(): boolean {
+  return getSettings().searchHistoryEnabled;
 }

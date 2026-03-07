@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Loader2, Eye, Heart, Check } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
+import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
+import { save, open } from '@tauri-apps/plugin-dialog';
 import { ImageViewer } from '@/components/image/ImageViewer';
 import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
+import { useDownloadStore } from '@/stores/downloadStore';
 
 export function ImageDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,8 +19,7 @@ export function ImageDetail() {
     enabled: !!id,
   });
 
-  const [downloading, setDownloading] = useState(false);
-  const [downloadDone, setDownloadDone] = useState(false);
+  const addTasks = useDownloadStore((s) => s.addTasks);
 
   const pages = illust
     ? illust.meta_pages.length > 0
@@ -37,32 +36,53 @@ export function ImageDetail() {
   }, [pages.length]);
 
   const handleDownload = useCallback(async () => {
-    if (!illust || downloading) return;
+    if (!illust) return;
 
-    const imageUrl = pages[currentPage]?.image_urls.large || illust.image_urls.large;
-    const ext = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg';
-    const defaultName = pages.length > 1
-      ? `${illust.id}_p${currentPage}.${ext}`
-      : `${illust.id}.${ext}`;
+    const isMulti = pages.length > 1;
 
-    const filePath = await save({
-      defaultPath: defaultName,
-      filters: [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
-    });
-    if (!filePath) return;
+    if (isMulti) {
+      const dir = await open({ directory: true, title: 'Choose download folder' });
+      if (!dir) return;
 
-    setDownloading(true);
-    setDownloadDone(false);
-    try {
-      await invoke('download_image', { url: imageUrl, path: filePath });
-      setDownloadDone(true);
-      setTimeout(() => setDownloadDone(false), 2000);
-    } catch (e) {
-      console.error('Download failed:', e);
-    } finally {
-      setDownloading(false);
+      const tasks = pages.map((page, i) => {
+        const url = page.image_urls.large || illust.image_urls.large;
+        const ext = url.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg';
+        const fileName = `${illust.id}_p${i}.${ext}`;
+        return {
+          id: `${illust.id}-p${i}-${Date.now()}`,
+          illustId: illust.id,
+          illustTitle: illust.title,
+          pageIndex: i,
+          totalPages: pages.length,
+          fileName,
+          url,
+          savePath: `${dir}/${fileName}`,
+        };
+      });
+      addTasks(tasks);
+    } else {
+      const url = pages[0]?.image_urls.large || illust.image_urls.large;
+      const ext = url.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg';
+      const fileName = `${illust.id}.${ext}`;
+
+      const filePath = await save({
+        defaultPath: fileName,
+        filters: [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+      });
+      if (!filePath) return;
+
+      addTasks([{
+        id: `${illust.id}-${Date.now()}`,
+        illustId: illust.id,
+        illustTitle: illust.title,
+        pageIndex: 0,
+        totalPages: 1,
+        fileName,
+        url,
+        savePath: filePath,
+      }]);
     }
-  }, [illust, pages, currentPage, downloading]);
+  }, [illust, pages, addTasks]);
 
   useEffect(() => {
     setCurrentPage(0);
@@ -100,24 +120,12 @@ export function ImageDetail() {
           Back
         </Link>
         <div className="flex items-center gap-2">
-          {isMultiPage && (
-            <span className="text-gray-400 text-sm">
-              {currentPage + 1} / {pages.length}
-            </span>
-          )}
           <button
             onClick={handleDownload}
-            disabled={downloading}
-            className="p-2 text-gray-300 hover:text-white disabled:opacity-50 transition-colors"
-            title="Download image"
+            className="p-2 text-gray-300 hover:text-white transition-colors"
+            title={isMultiPage ? `Download all ${pages.length} images` : 'Download image'}
           >
-            {downloading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : downloadDone ? (
-              <Check className="w-5 h-5 text-green-400" />
-            ) : (
-              <Download className="w-5 h-5" />
-            )}
+            <Download className="w-5 h-5" />
           </button>
         </div>
       </div>

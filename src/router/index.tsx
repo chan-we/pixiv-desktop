@@ -1,11 +1,13 @@
 import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
-import { Home as HomeIcon, Search, Settings } from 'lucide-react';
+import { Home as HomeIcon, Search, Settings, Download } from 'lucide-react';
 import { getAuth } from '@/utils/storage';
 import { Login } from '@/pages/Login';
 import { Home } from '@/pages/Home';
 import { Search as SearchPage } from '@/pages/Search';
 import { ImageDetail } from '@/pages/ImageDetail';
 import { Settings as SettingsPage } from '@/pages/Settings';
+import { DownloadPanel } from '@/components/download/DownloadPanel';
+import { useDownloadStore } from '@/stores/downloadStore';
 
 function checkAuth() {
   const auth = getAuth();
@@ -22,6 +24,28 @@ function requireAuth() {
   return null;
 }
 
+function DownloadNavButton() {
+  const { tasks, panelOpen, togglePanel } = useDownloadStore();
+  const activeCount = tasks.filter((t) => t.status === 'pending' || t.status === 'downloading').length;
+
+  return (
+    <button
+      onClick={togglePanel}
+      className={`flex items-center gap-1.5 transition-colors relative ${
+        panelOpen ? 'text-white' : 'text-gray-300 hover:text-white'
+      }`}
+    >
+      <Download className="w-4 h-4" />
+      Downloads
+      {activeCount > 0 && (
+        <span className="absolute -top-1.5 -right-3 min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold text-white bg-blue-500 rounded-full">
+          {activeCount}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function Layout() {
   return (
     <div className="min-h-screen bg-gray-900">
@@ -36,6 +60,7 @@ function Layout() {
               <Search className="w-4 h-4" />
               Search
             </a>
+            <DownloadNavButton />
             <a href="/settings" className="flex items-center gap-1.5 text-gray-300 hover:text-white transition-colors">
               <Settings className="w-4 h-4" />
               Settings
@@ -46,6 +71,7 @@ function Layout() {
       <main>
         <Outlet />
       </main>
+      <DownloadPanel />
     </div>
   );
 }
