@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SearchInput } from '@/components/search/SearchInput';
@@ -9,12 +9,16 @@ import {
   type SearchFilters,
 } from '@/components/search/SearchFilterDrawer';
 import { pixivApi } from '@/services/api/pixiv';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [filters, setFilters] = useState<SearchFilters>({ ...defaultFilters });
   const [filterOpen, setFilterOpen] = useState(false);
+
+  const debouncedKeyword = useDebouncedValue(keyword, 300);
+  const debouncedFilters = useDebouncedValue(filters, 300);
 
   const hasActiveFilters =
     filters.searchTarget !== defaultFilters.searchTarget ||
@@ -28,21 +32,27 @@ export function Search() {
     }
   }, [searchParams]);
 
+  const searchQueryKey = useMemo(
+    () => ['search', debouncedKeyword, debouncedFilters] as const,
+    [debouncedKeyword, debouncedFilters]
+  );
+
   const { data, isLoading } = useQuery({
-    queryKey: ['search', keyword, filters],
-    queryFn: () =>
-      pixivApi.searchIllust(keyword, {
-        sort: filters.sort,
-        searchTarget: filters.searchTarget,
-        r18: filters.r18 || undefined,
+    queryKey: searchQueryKey,
+    queryFn: ({ signal }) =>
+      pixivApi.searchIllust(debouncedKeyword, {
+        sort: debouncedFilters.sort,
+        searchTarget: debouncedFilters.searchTarget,
+        r18: debouncedFilters.r18 || undefined,
+        signal,
       }),
-    enabled: keyword.length > 0,
+    enabled: debouncedKeyword.length > 0,
   });
 
   const { data: suggestionsData } = useQuery({
-    queryKey: ['suggestions', keyword],
-    queryFn: () => pixivApi.getSearchSuggestions(keyword),
-    enabled: keyword.length > 0,
+    queryKey: ['suggestions', debouncedKeyword],
+    queryFn: ({ signal }) => pixivApi.getSearchSuggestions(debouncedKeyword, signal),
+    enabled: debouncedKeyword.length > 0,
   });
 
   const suggestions = suggestionsData?.candidates?.map(c => c.tag_name) || [];
