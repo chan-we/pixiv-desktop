@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Eye, Heart, Check } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import { ImageViewer } from '@/components/image/ImageViewer';
 import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
@@ -17,6 +19,9 @@ export function ImageDetail() {
     enabled: !!id,
   });
 
+  const [downloading, setDownloading] = useState(false);
+  const [downloadDone, setDownloadDone] = useState(false);
+
   const pages = illust
     ? illust.meta_pages.length > 0
       ? illust.meta_pages
@@ -30,6 +35,34 @@ export function ImageDetail() {
   const goToNext = useCallback(() => {
     setCurrentPage((p) => Math.min(pages.length - 1, p + 1));
   }, [pages.length]);
+
+  const handleDownload = useCallback(async () => {
+    if (!illust || downloading) return;
+
+    const imageUrl = pages[currentPage]?.image_urls.large || illust.image_urls.large;
+    const ext = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg';
+    const defaultName = pages.length > 1
+      ? `${illust.id}_p${currentPage}.${ext}`
+      : `${illust.id}.${ext}`;
+
+    const filePath = await save({
+      defaultPath: defaultName,
+      filters: [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+    });
+    if (!filePath) return;
+
+    setDownloading(true);
+    setDownloadDone(false);
+    try {
+      await invoke('download_image', { url: imageUrl, path: filePath });
+      setDownloadDone(true);
+      setTimeout(() => setDownloadDone(false), 2000);
+    } catch (e) {
+      console.error('Download failed:', e);
+    } finally {
+      setDownloading(false);
+    }
+  }, [illust, pages, currentPage, downloading]);
 
   useEffect(() => {
     setCurrentPage(0);
@@ -72,8 +105,19 @@ export function ImageDetail() {
               {currentPage + 1} / {pages.length}
             </span>
           )}
-          <button className="p-2 text-gray-300 hover:text-white transition-colors">
-            <Download className="w-5 h-5" />
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="p-2 text-gray-300 hover:text-white disabled:opacity-50 transition-colors"
+            title="Download image"
+          >
+            {downloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : downloadDone ? (
+              <Check className="w-5 h-5 text-green-400" />
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>
@@ -157,7 +201,7 @@ export function ImageDetail() {
               to={`/search?q=${encodeURIComponent(tag.name)}`}
               className="px-2 py-1 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 text-xs rounded transition-colors cursor-pointer"
             >
-              {tag.translated_name || tag.name}
+              {tag.translated_name ? `${tag.name} / ${tag.translated_name}` : tag.name}
             </Link>
           ))}
         </div>

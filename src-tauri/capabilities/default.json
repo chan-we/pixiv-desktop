@@ -14,6 +14,7 @@
         { "url": "https://v2.api.pixiv.net/**" },
         { "url": "https://i.pximg.net/**" }
       ]
-    }
+    },
+    "dialog:default"
   ]
 }
