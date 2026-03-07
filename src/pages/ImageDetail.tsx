@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
@@ -8,6 +8,7 @@ import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
 import { useDownloadStore } from '@/stores/downloadStore';
+import { useImagePreload } from '@/hooks/useImagePreload';
 import type { IllustDetail } from '@/types';
 
 export function ImageDetail() {
@@ -56,11 +57,20 @@ export function ImageDetail() {
     bookmarkMutation.mutate(illust.is_bookmarked);
   }, [illust, bookmarkMutation]);
 
-  const pages = illust
-    ? illust.meta_pages.length > 0
-      ? illust.meta_pages
-      : [{ image_urls: { large: illust.meta_single_page.original_image_url || illust.image_urls.large, square_medium: illust.image_urls.square_medium } }]
-    : [];
+  const pages = useMemo(() =>
+    illust
+      ? illust.meta_pages.length > 0
+        ? illust.meta_pages
+        : [{ image_urls: { large: illust.meta_single_page.original_image_url || illust.image_urls.large, square_medium: illust.image_urls.square_medium } }]
+      : [],
+    [illust],
+  );
+
+  const preloadUrls = useMemo(
+    () => pages.map((p) => proxyImageUrl(p.image_urls.large)),
+    [pages],
+  );
+  useImagePreload(preloadUrls, currentPage);
 
   const goToPrev = useCallback(() => {
     setCurrentPage((p) => Math.max(0, p - 1));
