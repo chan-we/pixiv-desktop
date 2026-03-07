@@ -152,12 +152,13 @@ export function ImageDetail() {
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
           {illust.tags.map((tag) => (
-            <span
+            <Link
               key={tag.name}
-              className="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded"
+              to={`/search?q=${encodeURIComponent(tag.name)}`}
+              className="px-2 py-1 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 text-xs rounded transition-colors cursor-pointer"
             >
               {tag.translated_name || tag.name}
-            </span>
+            </Link>
           ))}
         </div>
         <div className="flex gap-4 mt-3 text-gray-400 text-sm">

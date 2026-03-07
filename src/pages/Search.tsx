@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Clock } from 'lucide-react';
@@ -11,6 +11,14 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [history] = useState(getSearchHistory);
+
+  useEffect(() => {
+    const q = searchParams.get('q') || '';
+    if (q && q !== keyword) {
+      setKeyword(q);
+      addSearchHistory(q);
+    }
+  }, [searchParams]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['search', keyword],
