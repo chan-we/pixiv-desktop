@@ -1,6 +1,6 @@
 [package]
 name = "pixiv-desktop"
-version = "0.1.1-alpha.2"
+version = "0.1.1-alpha.3"
 description = "Pixiv Desktop Client"
 authors = ["you"]
 edition = "2021"
