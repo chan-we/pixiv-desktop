@@ -2,13 +2,34 @@ use tauri::http::Response as HttpResponse;
 use tauri::Manager;
 use tauri::WebviewWindow;
 
+fn log_to_webview(window: &WebviewWindow, msg: &str) {
+    let json_msg = serde_json::to_string(msg).unwrap_or_default();
+    let _ = window.eval(&format!("console.log('[Rust]', {})", json_msg));
+}
+
 fn forward_deep_link(window: &WebviewWindow, url: &str) {
+    eprintln!("[Rust] forward_deep_link called with url: {}", url);
+    log_to_webview(window, &format!("forward_deep_link called with url: {}", url));
+
     let json = serde_json::to_string(url).unwrap_or_default();
     let js = format!(
         "window.dispatchEvent(new CustomEvent('deep-link', {{ detail: {} }}))",
         json
     );
-    let _ = window.eval(&js);
+    eprintln!("[Rust] evaluating JS: {}", js);
+    match window.eval(&js) {
+        Ok(_) => {
+            eprintln!("[Rust] deep-link event dispatched successfully");
+            log_to_webview(window, "deep-link event dispatched successfully");
+        }
+        Err(e) => {
+            eprintln!("[Rust] failed to dispatch deep-link event: {:?}", e);
+            let _ = window.eval(&format!(
+                "console.error('[Rust] failed to dispatch deep-link event:', {})",
+                serde_json::to_string(&format!("{:?}", e)).unwrap_or_default()
+            ));
+        }
+    }
 }
 
 fn pixiv_client() -> reqwest::Client {
@@ -53,15 +74,27 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            eprintln!("[Rust] single-instance callback triggered, argv: {:?}, cwd: {:?}", argv, _cwd);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
+                log_to_webview(&window, &format!("single-instance argv: {:?}", argv));
 
+                let mut found_deep_link = false;
                 for arg in argv.iter() {
+                    eprintln!("[Rust] checking argv item: {}", arg);
                     if arg.starts_with("pixiv://") || arg.starts_with("pixiv-desktop://") {
+                        eprintln!("[Rust] matched deep link scheme: {}", arg);
                         forward_deep_link(&window, arg);
+                        found_deep_link = true;
                         break;
                     }
                 }
+                if !found_deep_link {
+                    eprintln!("[Rust] no deep link found in argv");
+                    log_to_webview(&window, "single-instance: no deep link found in argv");
+                }
+            } else {
+                eprintln!("[Rust] single-instance: could not get main window");
             }
         }))
         .invoke_handler(tauri::generate_handler![download_image])
@@ -120,12 +153,21 @@ pub fn run() {
                 }
             });
         })
-        .setup(|_app| {
-            #[cfg(debug_assertions)]
-            {
-                let window = _app.get_webview_window("main").unwrap();
+        .setup(|app| {
+            eprintln!("[Rust] app setup starting, platform: {}", std::env::consts::OS);
+
+            if let Some(window) = app.get_webview_window("main") {
+                #[cfg(debug_assertions)]
                 window.open_devtools();
+
+                log_to_webview(&window, &format!(
+                    "app started, platform: {}, debug: {}",
+                    std::env::consts::OS,
+                    cfg!(debug_assertions)
+                ));
             }
+
+            eprintln!("[Rust] app setup complete, deep-link schemes: pixiv://, pixiv-desktop://");
             Ok(())
         })
         .run(tauri::generate_context!())

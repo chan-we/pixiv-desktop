@@ -34,23 +34,26 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: async (code: string) => {
+        console.log('[AuthStore] login called, code:', code.slice(0, 8) + '...');
         let { codeVerifier } = get();
+        console.log('[AuthStore] codeVerifier from zustand:', codeVerifier ? `yes (${codeVerifier.length} chars)` : 'no');
 
-        // 尝试从 localStorage 获取 code verifier 作为后备
         if (!codeVerifier) {
           codeVerifier = localStorage.getItem('oauth_code_verifier');
-          console.log('Got codeVerifier from localStorage:', codeVerifier ? 'yes' : 'no');
+          console.log('[AuthStore] codeVerifier from localStorage:', codeVerifier ? `yes (${codeVerifier.length} chars)` : 'no');
         }
 
         if (!codeVerifier) {
+          console.error('[AuthStore] no codeVerifier found in zustand or localStorage');
           throw new Error('Code verifier not found. Please try logging in again.');
         }
 
         set({ isLoading: true });
         try {
+          console.log('[AuthStore] calling getAccessToken...');
           const response = await getAccessToken(code, codeVerifier);
+          console.log('[AuthStore] getAccessToken succeeded, user:', response.user?.name, 'expires_in:', response.expires_in);
 
-          // 清除 localStorage 中的 code verifier
           localStorage.removeItem('oauth_code_verifier');
 
           const authData = {
@@ -66,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
           };
 
           saveAuth(authData);
+          console.log('[AuthStore] auth data saved to localStorage');
 
           set({
             accessToken: response.access_token,
@@ -75,7 +79,14 @@ export const useAuthStore = create<AuthState>()(
             codeVerifier: null,
             isLoading: false,
           });
+          console.log('[AuthStore] zustand state updated, login complete');
         } catch (error) {
+          console.error('[AuthStore] login error:', error);
+          console.error('[AuthStore] error type:', typeof error, 'instanceof Error:', error instanceof Error);
+          if (error instanceof Error) {
+            console.error('[AuthStore] error message:', error.message);
+            console.error('[AuthStore] error stack:', error.stack);
+          }
           set({ isLoading: false });
           throw error;
         }

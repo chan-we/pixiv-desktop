@@ -11,8 +11,11 @@ import { getVersion } from '@tauri-apps/api/app';
 function extractCodeFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    return parsed.searchParams.get('code');
-  } catch {
+    const code = parsed.searchParams.get('code');
+    console.log('[Login] extractCodeFromUrl:', { url, code: code ? `${code.slice(0, 8)}...` : null });
+    return code;
+  } catch (e) {
+    console.error('[Login] extractCodeFromUrl failed to parse URL:', url, e);
     return null;
   }
 }
@@ -30,11 +33,21 @@ export function Login() {
 
   const handleLogin = useCallback(
     async (code: string) => {
+      console.log('[Login] handleLogin called with code:', code.slice(0, 8) + '...');
       try {
         await login(code);
+        console.log('[Login] login succeeded, navigating to /');
         navigate('/');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Login failed');
+        const message =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : JSON.stringify(err);
+        console.error('[Login] login failed:', err);
+        console.error('[Login] error type:', typeof err, 'instanceof Error:', err instanceof Error);
+        setError(message || 'Login failed (unknown error)');
       }
     },
     [login, navigate]
@@ -42,50 +55,67 @@ export function Login() {
 
   useEffect(() => {
     const auth = getAuth();
+    console.log('[Login] checking existing auth:', auth ? { expiresAt: auth.expiresAt, now: Date.now(), valid: auth.expiresAt > Date.now() } : 'none');
     if (auth && auth.expiresAt > Date.now()) {
+      console.log('[Login] valid auth found, navigating to /');
       navigate('/');
       return;
     }
 
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    console.log('[Login] URL search params:', window.location.search, 'code:', code ? `${code.slice(0, 8)}...` : 'null');
 
     if (code) {
       handleLogin(code);
     }
   }, [navigate, handleLogin]);
 
-  // Listen for deep link URLs forwarded from the Rust single-instance callback via window.eval()
   useEffect(() => {
     const handler = (e: Event) => {
-      const url = (e as CustomEvent).detail as string;
+      const detail = (e as CustomEvent).detail;
+      console.log('[Login] deep-link event received, detail:', detail, 'type:', typeof detail);
+      const url = detail as string;
       const code = extractCodeFromUrl(url);
       if (code) {
+        console.log('[Login] deep-link extracted code, calling handleLogin');
         handleLogin(code);
+      } else {
+        console.warn('[Login] deep-link received but no code extracted from URL:', url);
       }
     };
 
+    console.log('[Login] registering deep-link event listener');
     window.addEventListener('deep-link', handler);
-    return () => window.removeEventListener('deep-link', handler);
+    return () => {
+      console.log('[Login] removing deep-link event listener');
+      window.removeEventListener('deep-link', handler);
+    };
   }, [handleLogin]);
 
   const handleAuthorize = async () => {
     try {
+      console.log('[Login] handleAuthorize: generating PKCE parameters...');
       const verifier = await generateCodeVerifier();
       const challenge = await generateCodeChallenge(verifier);
+      console.log('[Login] PKCE generated, verifier length:', verifier.length, 'challenge length:', challenge.length);
 
       localStorage.setItem('oauth_code_verifier', verifier);
       setCodeVerifier(verifier);
+      console.log('[Login] code_verifier stored in localStorage and zustand');
 
       const url = getAuthorizeUrl(challenge);
       setAuthUrl(url);
+      console.log('[Login] authorize URL:', url);
 
       try {
         await open(url);
+        console.log('[Login] browser opened successfully');
       } catch (e) {
-        console.error('Failed to open browser:', e);
+        console.error('[Login] failed to open browser:', e);
       }
     } catch (err) {
+      console.error('[Login] handleAuthorize error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate URL');
     }
   };
