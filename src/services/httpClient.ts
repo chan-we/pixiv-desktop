@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { PIXIV_API_BASE, PIXIV_CLIENT_ID, PIXIV_CLIENT_SECRET } from '@/utils/constants';
+import { invoke } from '@tauri-apps/api/core';
+import { PIXIV_API_BASE } from '@/utils/constants';
 import { getAuth, saveAuth } from '@/utils/storage';
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -19,20 +20,11 @@ async function doRefreshToken(): Promise<string> {
   const auth = getAuth();
   if (!auth?.refreshToken) throw new Error('No refresh token');
 
-  const response = await fetch('https://oauth.secure.pixiv.net/auth/token', {
-    method: 'POST',
-    headers: { ...DEFAULT_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: auth.refreshToken,
-      client_id: PIXIV_CLIENT_ID,
-      client_secret: PIXIV_CLIENT_SECRET,
-    }).toString(),
+  const body = await invoke<string>('refresh_oauth_token', {
+    refreshToken: auth.refreshToken,
   });
+  const data = JSON.parse(body);
 
-  if (!response.ok) throw new Error('Token refresh failed');
-
-  const data = await response.json();
   saveAuth({
     ...auth,
     accessToken: data.access_token,
