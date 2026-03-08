@@ -6,27 +6,48 @@ use tauri::{Manager, State};
 use tauri::WebviewWindow;
 
 // ---------------------------------------------------------------------------
-// Proxy state (shared across commands and protocol handlers)
+// Proxy state — caches a shared reqwest::Client so all requests reuse
+// connections instead of creating a new client per request.
 // ---------------------------------------------------------------------------
 
-struct ProxyState(RwLock<Option<String>>);
-
-fn read_proxy(state: &ProxyState) -> Option<String> {
-    state.0.read().ok().and_then(|g| g.clone())
+struct ProxyState {
+    url: RwLock<Option<String>>,
+    client: RwLock<reqwest::Client>,
 }
 
-fn build_client(proxy_url: &Option<String>) -> Result<reqwest::Client, String> {
-    let mut builder = reqwest::Client::builder().user_agent(PIXIV_UA);
-    if let Some(url) = proxy_url {
-        if !url.is_empty() {
-            let proxy = reqwest::Proxy::all(url)
-                .map_err(|e| format!("Invalid proxy URL '{url}': {e}"))?;
-            builder = builder.proxy(proxy);
+impl ProxyState {
+    fn new() -> Self {
+        ProxyState {
+            url: RwLock::new(None),
+            client: RwLock::new(Self::make_client(&None)),
         }
     }
-    builder
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {e}"))
+
+    fn make_client(proxy_url: &Option<String>) -> reqwest::Client {
+        let mut builder = reqwest::Client::builder().user_agent(PIXIV_UA);
+        if let Some(url) = proxy_url {
+            if !url.is_empty() {
+                if let Ok(proxy) = reqwest::Proxy::all(url) {
+                    builder = builder.proxy(proxy);
+                }
+            }
+        }
+        builder.build().unwrap_or_else(|_| reqwest::Client::new())
+    }
+
+    fn set_url(&self, new_url: Option<String>) {
+        let client = Self::make_client(&new_url);
+        if let Ok(mut g) = self.url.write() { *g = new_url; }
+        if let Ok(mut g) = self.client.write() { *g = client; }
+    }
+
+    fn client(&self) -> reqwest::Client {
+        self.client.read().map(|g| g.clone()).unwrap_or_else(|_| reqwest::Client::new())
+    }
+
+    fn proxy_url(&self) -> Option<String> {
+        self.url.read().ok().and_then(|g| g.clone())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -90,15 +111,14 @@ fn format_reqwest_error(e: &reqwest::Error) -> String {
 
 #[tauri::command]
 async fn set_proxy(url: Option<String>, state: State<'_, ProxyState>) -> Result<(), String> {
-    let mut guard = state.0.write().map_err(|e| format!("Lock error: {e}"))?;
     eprintln!("[Rust] set_proxy: {:?}", url);
-    *guard = url;
+    state.set_url(url);
     Ok(())
 }
 
 #[tauri::command]
 async fn get_proxy(state: State<'_, ProxyState>) -> Result<Option<String>, String> {
-    Ok(read_proxy(&state))
+    Ok(state.proxy_url())
 }
 
 #[tauri::command]
@@ -146,8 +166,7 @@ async fn proxy_fetch(
     body: Option<String>,
     state: State<'_, ProxyState>,
 ) -> Result<FetchResponse, String> {
-    let proxy_url = read_proxy(&state);
-    let client = build_client(&proxy_url)?;
+    let client = state.client();
 
     let mut req = match method.to_uppercase().as_str() {
         "GET" => client.get(&url),
@@ -200,8 +219,7 @@ async fn exchange_oauth_token(
         code_verifier.len()
     );
 
-    let proxy_url = read_proxy(&state);
-    let client = build_client(&proxy_url)?;
+    let client = state.client();
 
     let params = [
         ("grant_type", "authorization_code"),
@@ -250,8 +268,7 @@ async fn refresh_oauth_token(
 ) -> Result<String, String> {
     eprintln!("[Rust] refresh_oauth_token called");
 
-    let proxy_url = read_proxy(&state);
-    let client = build_client(&proxy_url)?;
+    let client = state.client();
 
     let params = [
         ("grant_type", "refresh_token"),
@@ -298,8 +315,7 @@ async fn download_image(
     path: String,
     state: State<'_, ProxyState>,
 ) -> Result<(), String> {
-    let proxy_url = read_proxy(&state);
-    let client = build_client(&proxy_url)?;
+    let client = state.client();
 
     let resp = client
         .get(&url)
@@ -331,7 +347,7 @@ async fn download_image(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(ProxyState(RwLock::new(None)))
+        .manage(ProxyState::new())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_http::init())
@@ -373,13 +389,10 @@ pub fn run() {
             proxy_fetch,
         ])
         .register_asynchronous_uri_scheme_protocol("pximg", |ctx, request, responder| {
-            let proxy_url: Option<String> = ctx
+            let client = ctx
                 .app_handle()
                 .state::<ProxyState>()
-                .0
-                .read()
-                .ok()
-                .and_then(|g| g.clone());
+                .client();
 
             let path_and_query = request
                 .uri()
@@ -389,7 +402,6 @@ pub fn run() {
             let pximg_url = format!("https://i.pximg.net{}", path_and_query);
 
             tauri::async_runtime::spawn(async move {
-                let client = build_client(&proxy_url).unwrap_or_else(|_| reqwest::Client::new());
                 match client
                     .get(&pximg_url)
                     .header("Referer", PIXIV_REFERER)
@@ -397,6 +409,7 @@ pub fn run() {
                     .await
                 {
                     Ok(resp) => {
+                        let status = resp.status();
                         let content_type = resp
                             .headers()
                             .get("content-type")
@@ -405,6 +418,9 @@ pub fn run() {
                             .to_string();
                         match resp.bytes().await {
                             Ok(bytes) => {
+                                if !status.is_success() {
+                                    eprintln!("[Rust] pximg {status} for {pximg_url}");
+                                }
                                 responder.respond(
                                     HttpResponse::builder()
                                         .header("Content-Type", &content_type)
@@ -413,7 +429,8 @@ pub fn run() {
                                         .unwrap(),
                                 );
                             }
-                            Err(_) => {
+                            Err(e) => {
+                                eprintln!("[Rust] pximg body read error for {pximg_url}: {e}");
                                 responder.respond(
                                     HttpResponse::builder()
                                         .status(502)
@@ -423,7 +440,8 @@ pub fn run() {
                             }
                         }
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        eprintln!("[Rust] pximg fetch error for {pximg_url}: {e}");
                         responder.respond(
                             HttpResponse::builder()
                                 .status(502)
