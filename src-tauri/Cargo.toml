@@ -1,6 +1,6 @@
 [package]
 name = "pixiv-desktop"
-version = "0.1.2"
+version = "0.1.4"
 description = "Pixiv Desktop Client"
 authors = ["you"]
 edition = "2021"
@@ -19,7 +19,7 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-http = { version = "2", default-features = false, features = ["rustls-tls-native-roots", "http2", "charset", "macos-system-configuration", "cookies"] }
 tauri-plugin-dialog = "2"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "socks"] }
 tokio = { version = "1", features = ["fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

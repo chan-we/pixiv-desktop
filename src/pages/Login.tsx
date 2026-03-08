@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, Copy, ExternalLink } from 'lucide-react';
+import { LogIn, Copy, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateCodeVerifier, generateCodeChallenge } from '@/utils/pkce';
 import { getAuthorizeUrl } from '@/services/api/oauth';
 import { useAuthStore } from '@/stores/authStore';
 import { getAuth } from '@/utils/storage';
 import { open } from '@tauri-apps/plugin-shell';
 import { getVersion } from '@tauri-apps/api/app';
+import { ProxySettings } from '@/components/ProxySettings';
 
 function extractCodeFromUrl(url: string): string | null {
   try {
@@ -26,6 +27,7 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [version, setVersion] = useState('');
+  const [showProxy, setShowProxy] = useState(false);
 
   useEffect(() => {
     getVersion().then(setVersion);
@@ -172,7 +174,22 @@ export function Login() {
           </div>
         )}
 
-        <p className="mt-6 text-center text-gray-500 text-sm">
+        <div className="mt-6 border-t border-gray-700 pt-4">
+          <button
+            onClick={() => setShowProxy(!showProxy)}
+            className="w-full flex items-center justify-between text-gray-400 hover:text-gray-300 text-sm transition-colors"
+          >
+            <span>Network Settings</span>
+            {showProxy ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {showProxy && (
+            <div className="mt-3 p-3 bg-gray-700/50 rounded-lg">
+              <ProxySettings compact />
+            </div>
+          )}
+        </div>
+
+        <p className="mt-4 text-center text-gray-500 text-sm">
           You will be redirected to Pixiv for authentication.
         </p>
       </div>

@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom';
 import './index.css';
 import router from './router';
 import { useAuthStore } from './stores/authStore';
+import { useProxyStore } from './stores/proxyStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,13 +16,17 @@ const queryClient = new QueryClient({
   },
 });
 
-// 初始化时检查登录状态
 const initializeAuth = () => {
   const checkAuth = useAuthStore.getState().checkAuth;
   checkAuth();
 };
 
+const initializeProxy = () => {
+  useProxyStore.getState().initProxy();
+};
+
 initializeAuth();
+initializeProxy();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

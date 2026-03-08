@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { User, LogOut, Info, LogIn } from 'lucide-react';
+import { User, LogOut, Info, LogIn, Globe } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { pixivApi } from '@/services/api/pixiv';
 import { getVersion } from '@tauri-apps/api/app';
 import { proxyImageUrl } from '@/utils/image';
+import { ProxySettings } from '@/components/ProxySettings';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -62,6 +63,14 @@ export function Settings() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-4 mb-4">
+        <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <Globe className="w-5 h-5" />
+          Network
+        </h2>
+        <ProxySettings />
       </div>
 
       {user && (

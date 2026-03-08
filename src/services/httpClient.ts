@@ -1,4 +1,3 @@
-import { fetch } from '@tauri-apps/plugin-http';
 import { invoke } from '@tauri-apps/api/core';
 import { PIXIV_API_BASE } from '@/utils/constants';
 import { getAuth, saveAuth } from '@/utils/storage';
@@ -12,6 +11,11 @@ const DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent': 'PixivIOSApp/7.13.3 (iOS 15.1; iPhone13,2)',
   'Referer': 'https://app-api.pixiv.net/',
 };
+
+interface RustFetchResponse {
+  status: number;
+  body: string;
+}
 
 let isRefreshing = false;
 let refreshPromise: Promise<string> | null = null;
@@ -88,11 +92,11 @@ async function request<T = unknown>(
     }
   }
 
-  const response = await fetch(fullUrl, {
+  const response = await invoke<RustFetchResponse>('proxy_fetch', {
+    url: fullUrl,
     method: options.method || 'GET',
     headers,
-    body: bodyStr,
-    signal: options.signal,
+    body: bodyStr ?? null,
   });
 
   if (response.status === 401 && retry) {
@@ -107,12 +111,11 @@ async function request<T = unknown>(
     }
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Request failed (${response.status}): ${text}`);
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Request failed (${response.status}): ${response.body}`);
   }
 
-  const data = await response.json() as T;
+  const data = JSON.parse(response.body) as T;
   return { data, status: response.status };
 }
 
