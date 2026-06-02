@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Loader2, Image as ImageIcon, BookOpen, ArrowLeft } from 'lucide-react';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
-import { IllustCard } from '@/components/image/IllustCard';
-import type { Illust } from '@/types';
+import { IllustGrid } from '@/components/image/IllustGrid';
+import type { SearchIllustResponse } from '@/types';
 
 export function UserProfile() {
   const { id } = useParams<{ id: string }>();
@@ -25,11 +25,29 @@ export function UserProfile() {
     enabled: !!userId,
   });
 
-  const { data: bookmarksData, isLoading: bookmarksLoading } = useQuery({
+  const {
+    data: bookmarksData,
+    isLoading: bookmarksLoading,
+    isFetchingNextPage: bookmarksFetchingNextPage,
+    hasNextPage: bookmarksHasNextPage,
+    fetchNextPage: fetchBookmarksNextPage,
+  } = useInfiniteQuery({
     queryKey: ['userBookmarks', userId],
-    queryFn: () => pixivApi.getUserBookmarks(userId),
+    queryFn: ({ signal, pageParam }) => {
+      if (pageParam) {
+        return pixivApi.fetchNextPage<SearchIllustResponse>(pageParam, signal);
+      }
+      return pixivApi.getUserBookmarks(userId);
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.next_url ?? undefined,
     enabled: !!userId,
   });
+
+  const allBookmarks = useMemo(
+    () => bookmarksData?.pages.flatMap((page) => page.illusts) ?? [],
+    [bookmarksData]
+  );
 
   if (detailLoading || !userDetail) {
     return (
@@ -105,31 +123,12 @@ export function UserProfile() {
       {/* Bookmarks */}
       <h2 className="text-lg font-bold text-white mt-10 mb-4">Bookmarks</h2>
       <IllustGrid
-        illusts={bookmarksData?.illusts ?? []}
+        illusts={allBookmarks}
         isLoading={bookmarksLoading}
+        isFetchingNextPage={bookmarksFetchingNextPage}
+        hasMore={bookmarksHasNextPage}
+        onLoadMore={fetchBookmarksNextPage}
       />
-    </div>
-  );
-}
-
-function IllustGrid({ illusts, isLoading }: { illusts: Illust[]; isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-      </div>
-    );
-  }
-
-  if (illusts.length === 0) {
-    return <div className="text-center py-12 text-gray-500">No works yet</div>;
-  }
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {illusts.map((illust) => (
-        <IllustCard key={illust.id} illust={illust} />
-      ))}
     </div>
   );
 }
