@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' data: blob: https://pximg.pximg.net https://i.pximg.net asset:; connect-src 'self' https://app-api.pixiv.net https://oauth.secure.pixiv.net https://i.pximg.net https://pximg.pximg.net asset:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "plugins": {

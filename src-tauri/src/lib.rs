@@ -8,6 +8,7 @@ use tauri::http::Response as HttpResponse;
 use tauri::{Manager, State};
 use tauri::WebviewWindow;
 use image::GenericImageView;
+use rayon::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Proxy state — caches a shared reqwest::Client so all requests reuse
@@ -348,7 +349,8 @@ async fn convert_ugoira(
     let frames: Vec<UgoiraFrame> = serde_json::from_str(&frames_json)
         .map_err(|e| format!("Failed to parse frames JSON: {}", e))?;
 
-    eprintln!("[Rust] Total frames: {}", frames.len());
+    let total_frames = frames.len();
+    eprintln!("[Rust] Total frames: {}", total_frames);
 
     // Get app data dir for caching
     let app_data_dir = dirs::data_dir()
@@ -414,8 +416,10 @@ async fn convert_ugoira(
             .map_err(|e| format!("Failed to read ZIP entry {}: {}", i, e))?;
 
         let outpath = frames_dir.join(file.name());
-        fs::create_dir_all(outpath.parent().unwrap())
-            .map_err(|e| format!("Failed to create dir: {}", e))?;
+        if let Some(parent) = outpath.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create dir: {}", e))?;
+        }
 
         let mut outfile = fs::File::create(&outpath)
             .map_err(|e| format!("Failed to create frame file: {}", e))?;
@@ -425,17 +429,35 @@ async fn convert_ugoira(
 
     eprintln!("[Rust] Extracted frames to {:?}", frames_dir);
 
-    // Create GIF
-    eprintln!("[Rust] Creating GIF with {} frames", frames.len());
+    // Decode frames in parallel using Rayon
+    eprintln!("[Rust] Decoding frames in parallel...");
 
-    // Load first frame to get dimensions
-    let first_frame_path = frames_dir.join(&frames[0].file);
-    let first_img = image::open(&first_frame_path)
+    let frames_dir_clone = frames_dir.clone();
+    let processed_frames: Vec<(String, Vec<u8>, u16)> = frames
+        .par_iter()
+        .with_max_len(1)
+        .map(|frame_info| {
+            let frame_path = frames_dir_clone.join(&frame_info.file);
+            let img = image::open(&frame_path)
+                .map_err(|e| format!("Failed to open frame {}: {}", frame_info.file, e))?;
+
+            let rgba = img.to_rgba8();
+            let pixels = rgba.into_raw();
+            let delay = (frame_info.delay / 10) as u16;
+            Ok::<_, String>((frame_info.file.clone(), pixels, delay))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to decode frames: {}", e))?;
+
+    eprintln!("[Rust] Creating GIF with {} frames", total_frames);
+
+    // Get dimensions from first frame
+    let first_path = frames_dir.join(&frames[0].file);
+    let first_img = image::open(&first_path)
         .map_err(|e| format!("Failed to open first frame: {}", e))?;
-
     let (width, height) = first_img.dimensions();
-    eprintln!("[Rust] Frame size: {}x{}", width, height);
 
+    // Create GIF encoder
     let file = fs::File::create(&gif_path)
         .map_err(|e| format!("Failed to create GIF file: {}", e))?;
     let mut writer = BufWriter::new(file);
@@ -446,26 +468,10 @@ async fn convert_ugoira(
     encoder.set_repeat(gif::Repeat::Infinite)
         .map_err(|e| format!("Failed to set GIF repeat: {}", e))?;
 
-    for frame_info in &frames {
-        let frame_path = frames_dir.join(&frame_info.file);
-        eprintln!("[Rust] Processing frame: {:?}", frame_path);
-
-        let img = image::open(&frame_path)
-            .map_err(|e| format!("Failed to open frame {}: {}", frame_info.file, e))?;
-
-        let rgba = img.to_rgba8();
-        let mut pixels: Vec<u8> = rgba.into_raw();
-
-        // Convert RGBA to indexed color (simple approach using first 256 colors)
-        let mut indexed_pixels = Vec::with_capacity(pixels.len() / 4);
-        for chunk in pixels.chunks(4) {
-            indexed_pixels.push(chunk[0] as u8); // Use R as index for simplicity
-        }
-
-        let delay_centis = (frame_info.delay / 10) as u16; // Convert ms to centiseconds
-
+    // Write frames
+    for (_, mut pixels, delay) in processed_frames {
         let mut gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut pixels, 10);
-        gif_frame.delay = delay_centis;
+        gif_frame.delay = delay;
 
         encoder.write_frame(&gif_frame)
             .map_err(|e| format!("Failed to write frame: {}", e))?;
@@ -493,7 +499,7 @@ async fn get_ugoira_gif(gif_path: String) -> Result<GifResponse, String> {
     eprintln!("[Rust] get_ugoira_gif: {:?}", gif_path);
 
     let bytes = fs::read(&gif_path)
-        .map_err(|e| format!("Failed to read GIF: {}", e))?;
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     let base64 = base64_encode(&bytes);
     Ok(GifResponse {

@@ -23,24 +23,30 @@ interface GifResponse {
  * We use Rust backend to:
  * 1. Download the ZIP
  * 2. Extract frames
- * 3. Encode as GIF
- * 4. Return the GIF as base64
+ * 3. Decode frames in parallel with Rayon
+ * 4. Encode as GIF animation
+ *
+ * Frame decoding is parallelized using Rayon for better performance.
  */
 export function UgoiraViewer({ illustId, src, alt = 'animation' }: UgoiraViewerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [webpUrl, setWebpUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<string>('');
-  const animationRef = useRef<HTMLImageElement>(null);
+  const isLoadingRef = useRef(false);
 
   // Load and convert animation
   const loadAnimation = useCallback(async () => {
+    if (isLoadingRef.current) {
+      console.log('[UgoiraViewer] Already loading, skipping duplicate call');
+      return;
+    }
+    isLoadingRef.current = true;
     setIsLoading(true);
     setError(null);
     setProgress('Getting animation info...');
 
     try {
-      // Get auth token
       const auth = getAuth();
       if (!auth?.accessToken) {
         throw new Error('Not authenticated');
@@ -59,35 +65,35 @@ export function UgoiraViewer({ illustId, src, alt = 'animation' }: UgoiraViewerP
       console.log('[UgoiraViewer] ZIP URL:', zipUrl);
       console.log('[UgoiraViewer] Frames:', frames.length);
 
-      // Call Rust to convert (returns file path as string)
+      // Call Rust to convert
       setProgress('Converting animation...');
       const framesJson = JSON.stringify(frames);
 
-      const gifFilePath = await invoke<string>('convert_ugoira', {
+      const webpFilePath = await invoke<string>('convert_ugoira', {
         illustId,
         zipUrl,
         framesJson,
         authToken: auth.accessToken,
       });
 
-      console.log('[UgoiraViewer] GIF created at:', gifFilePath);
+      console.log('[UgoiraViewer] WebP created at:', webpFilePath);
 
       // Get base64 data
-      setProgress('Loading GIF...');
-      console.log('[UgoiraViewer] Getting GIF from:', gifFilePath);
-      const gifData = await invoke<GifResponse>('get_ugoira_gif', {
-        gifPath: gifFilePath,
+      setProgress('Loading WebP...');
+      const webpData = await invoke<GifResponse>('get_ugoira_gif', {
+        gifPath: webpFilePath,
       });
 
       // Create data URL
-      const dataUrl = `data:image/gif;base64,${gifData.data}`;
-      setGifUrl(dataUrl);
+      const dataUrl = `data:image/gif;base64,${webpData.data}`;
+      setWebpUrl(dataUrl);
       setProgress('Done!');
     } catch (err) {
       console.error('[UgoiraViewer] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to convert animation');
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [illustId]);
 
@@ -97,10 +103,9 @@ export function UgoiraViewer({ illustId, src, alt = 'animation' }: UgoiraViewerP
 
   return (
     <div className="w-full h-full flex items-center justify-center relative">
-      {gifUrl ? (
+      {webpUrl ? (
         <img
-          ref={animationRef}
-          src={gifUrl}
+          src={webpUrl}
           alt={alt}
           className="max-w-full max-h-full object-contain"
         />
@@ -112,10 +117,10 @@ export function UgoiraViewer({ illustId, src, alt = 'animation' }: UgoiraViewerP
         />
       )}
 
-      {/* GIF badge */}
+      {/* WebP badge */}
       <div className="absolute bottom-4 left-4 px-2 py-1 rounded bg-black/60 text-white text-xs flex items-center gap-1">
         <Film className="w-3 h-3" />
-        GIF
+        WebP
       </div>
 
       {/* Loading state */}
