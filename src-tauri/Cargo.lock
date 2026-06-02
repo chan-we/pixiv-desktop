@@ -2861,7 +2861,7 @@ dependencies = [
 
 [[package]]
 name = "pixiv-desktop"
-version = "0.1.1-alpha.3"
+version = "0.1.1-alpha.4"
 dependencies = [
  "dirs 5.0.1",
  "gif 0.11.4",
