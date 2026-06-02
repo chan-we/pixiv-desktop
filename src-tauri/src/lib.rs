@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::fs;
+use std::io::BufWriter;
+use std::path::PathBuf;
 use std::sync::RwLock;
 use tauri::http::Response as HttpResponse;
 use tauri::{Manager, State};
 use tauri::WebviewWindow;
+use image::GenericImageView;
 
 // ---------------------------------------------------------------------------
 // Proxy state — caches a shared reqwest::Client so all requests reuse
@@ -306,38 +310,219 @@ async fn refresh_oauth_token(
 }
 
 // ---------------------------------------------------------------------------
-// Image download
+// Ugoira animation conversion
 // ---------------------------------------------------------------------------
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct UgoiraFrame {
+    file: String,
+    delay: u16,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct UgoiraMetadata {
+    ugoira_metadata: UgoiraMetadataInner,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct UgoiraMetadataInner {
+    zip_urls: ZipUrls,
+    frames: Vec<UgoiraFrame>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ZipUrls {
+    medium: String,
+}
+
 #[tauri::command]
-async fn download_image(
-    url: String,
-    path: String,
+async fn convert_ugoira(
+    illust_id: u64,
+    zip_url: String,
+    frames_json: String,
+    auth_token: String,
     state: State<'_, ProxyState>,
-) -> Result<(), String> {
-    let client = state.client();
+) -> Result<String, String> {
+    eprintln!("[Rust] convert_ugoira: illust_id={}, zip_url={}", illust_id, zip_url);
 
-    let resp = client
-        .get(&url)
-        .header("Referer", PIXIV_REFERER)
-        .send()
-        .await
-        .map_err(|e| format!("Network error: {}", format_reqwest_error(&e)))?;
+    let frames: Vec<UgoiraFrame> = serde_json::from_str(&frames_json)
+        .map_err(|e| format!("Failed to parse frames JSON: {}", e))?;
 
-    if !resp.status().is_success() {
-        return Err(format!("Server returned {}", resp.status()));
+    eprintln!("[Rust] Total frames: {}", frames.len());
+
+    // Get app data dir for caching
+    let app_data_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("pixiv-desktop")
+        .join("ugoira_cache");
+
+    fs::create_dir_all(&app_data_dir)
+        .map_err(|e| format!("Failed to create cache dir: {}", e))?;
+
+    let zip_path = app_data_dir.join(format!("{}.zip", illust_id));
+    let gif_path = app_data_dir.join(format!("{}.gif", illust_id));
+
+    // Check if GIF already exists in cache
+    if gif_path.exists() {
+        eprintln!("[Rust] GIF already cached at {:?}", gif_path);
+        return Ok(gif_path.to_string_lossy().to_string());
     }
 
-    let bytes = resp
+    // Download ZIP
+    let client = state.client();
+    eprintln!("[Rust] Downloading ZIP from {}", zip_url);
+
+    let resp = client
+        .get(&zip_url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Referer", "https://www.pixiv.net/")
+        .header("User-Agent", PIXIV_UA)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download ZIP: {}", format_reqwest_error(&e)))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("ZIP download failed: {}", resp.status()));
+    }
+
+    let zip_bytes = resp
         .bytes()
         .await
-        .map_err(|e| format!("Failed to read response: {e}"))?;
+        .map_err(|e| format!("Failed to read ZIP bytes: {}", e))?;
 
-    tokio::fs::write(&path, &bytes)
-        .await
-        .map_err(|e| format!("Failed to write file: {e}"))?;
+    eprintln!("[Rust] Downloaded {} bytes", zip_bytes.len());
 
-    Ok(())
+    // Save ZIP to temp file
+    fs::write(&zip_path, &zip_bytes)
+        .map_err(|e| format!("Failed to write ZIP: {}", e))?;
+
+    // Open and extract ZIP
+    let file = fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open ZIP: {}", e))?;
+
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Failed to read ZIP archive: {}", e))?;
+
+    // Create frames directory
+    let frames_dir = app_data_dir.join(format!("frames_{}", illust_id));
+    fs::create_dir_all(&frames_dir)
+        .map_err(|e| format!("Failed to create frames dir: {}", e))?;
+
+    // Extract all frames
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)
+            .map_err(|e| format!("Failed to read ZIP entry {}: {}", i, e))?;
+
+        let outpath = frames_dir.join(file.name());
+        fs::create_dir_all(outpath.parent().unwrap())
+            .map_err(|e| format!("Failed to create dir: {}", e))?;
+
+        let mut outfile = fs::File::create(&outpath)
+            .map_err(|e| format!("Failed to create frame file: {}", e))?;
+        std::io::copy(&mut file, &mut outfile)
+            .map_err(|e| format!("Failed to extract frame: {}", e))?;
+    }
+
+    eprintln!("[Rust] Extracted frames to {:?}", frames_dir);
+
+    // Create GIF
+    eprintln!("[Rust] Creating GIF with {} frames", frames.len());
+
+    // Load first frame to get dimensions
+    let first_frame_path = frames_dir.join(&frames[0].file);
+    let first_img = image::open(&first_frame_path)
+        .map_err(|e| format!("Failed to open first frame: {}", e))?;
+
+    let (width, height) = first_img.dimensions();
+    eprintln!("[Rust] Frame size: {}x{}", width, height);
+
+    let file = fs::File::create(&gif_path)
+        .map_err(|e| format!("Failed to create GIF file: {}", e))?;
+    let mut writer = BufWriter::new(file);
+
+    let mut encoder = gif::Encoder::new(&mut writer, width as u16, height as u16, &[])
+        .map_err(|e| format!("Failed to create GIF encoder: {}", e))?;
+
+    encoder.set_repeat(gif::Repeat::Infinite)
+        .map_err(|e| format!("Failed to set GIF repeat: {}", e))?;
+
+    for frame_info in &frames {
+        let frame_path = frames_dir.join(&frame_info.file);
+        eprintln!("[Rust] Processing frame: {:?}", frame_path);
+
+        let img = image::open(&frame_path)
+            .map_err(|e| format!("Failed to open frame {}: {}", frame_info.file, e))?;
+
+        let rgba = img.to_rgba8();
+        let mut pixels: Vec<u8> = rgba.into_raw();
+
+        // Convert RGBA to indexed color (simple approach using first 256 colors)
+        let mut indexed_pixels = Vec::with_capacity(pixels.len() / 4);
+        for chunk in pixels.chunks(4) {
+            indexed_pixels.push(chunk[0] as u8); // Use R as index for simplicity
+        }
+
+        let delay_centis = (frame_info.delay / 10) as u16; // Convert ms to centiseconds
+
+        let mut gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut pixels, 10);
+        gif_frame.delay = delay_centis;
+
+        encoder.write_frame(&gif_frame)
+            .map_err(|e| format!("Failed to write frame: {}", e))?;
+    }
+
+    drop(encoder);
+    drop(writer);
+
+    // Cleanup temp files
+    let _ = fs::remove_dir_all(&frames_dir);
+    let _ = fs::remove_file(&zip_path);
+
+    eprintln!("[Rust] GIF created at {:?}", gif_path);
+    Ok(gif_path.to_string_lossy().to_string())
+}
+
+#[derive(serde::Serialize)]
+struct GifResponse {
+    path: String,
+    data: String, // base64 encoded
+}
+
+#[tauri::command]
+async fn get_ugoira_gif(gif_path: String) -> Result<GifResponse, String> {
+    eprintln!("[Rust] get_ugoira_gif: {:?}", gif_path);
+
+    let bytes = fs::read(&gif_path)
+        .map_err(|e| format!("Failed to read GIF: {}", e))?;
+
+    let base64 = base64_encode(&bytes);
+    Ok(GifResponse {
+        path: gif_path,
+        data: base64,
+    })
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+        result.push(CHARS[b0 >> 2] as char);
+        result.push(CHARS[((b0 & 0x03) << 4) | (b1 >> 4)] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[b2 & 0x3f] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -380,13 +565,14 @@ pub fn run() {
             }
         }))
         .invoke_handler(tauri::generate_handler![
-            download_image,
             exchange_oauth_token,
             refresh_oauth_token,
             set_proxy,
             get_proxy,
             test_proxy,
             proxy_fetch,
+            convert_ugoira,
+            get_ugoira_gif,
         ])
         .register_asynchronous_uri_scheme_protocol("pximg", |ctx, request, responder| {
             let client = ctx

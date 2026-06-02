@@ -5,6 +5,7 @@ import type {
   RankingIllustResponse,
   SearchSuggestionResponse,
   UserDetailResponse,
+  UgoiraMetadataResponse,
 } from '@/types';
 
 export const pixivApi = {
@@ -144,6 +145,14 @@ export const pixivApi = {
 
   fetchNextPage: async <T = unknown>(nextUrl: string, signal?: AbortSignal) => {
     const response = await httpClient.get<T>(nextUrl, { signal });
+    return response.data;
+  },
+
+  // 获取动图（Ugoira）元数据
+  getUgoiraMetadata: async (illustId: number) => {
+    const response = await httpClient.get<UgoiraMetadataResponse>(
+      `/v1/ugoira/metadata?illust_id=${illustId}`
+    );
     return response.data;
   },
 };

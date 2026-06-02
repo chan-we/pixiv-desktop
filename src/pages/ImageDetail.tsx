@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Download, Loader2, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Eye, Heart, Sparkles, Film } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { ImageViewer } from '@/components/image/ImageViewer';
+import { SimpleImage } from '@/components/image/SimpleImage';
+import { UgoiraViewer } from '@/components/image/UgoiraViewer';
 import { ImagePager } from '@/components/image/ImagePager';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
@@ -61,7 +62,14 @@ export function ImageDetail() {
     illust
       ? illust.meta_pages.length > 0
         ? illust.meta_pages
-        : [{ image_urls: { large: illust.meta_single_page.original_image_url || illust.image_urls.large, square_medium: illust.image_urls.square_medium } }]
+        : [{
+            image_urls: {
+              large: illust.meta_single_page?.original_image_url || illust.image_urls?.large || '',
+              square_medium: illust.image_urls?.square_medium || '',
+              medium: illust.image_urls?.medium || '',
+              original: illust.meta_single_page?.original_image_url || '',
+            }
+          }]
       : [],
     [illust],
   );
@@ -152,6 +160,25 @@ export function ImageDetail() {
 
   const currentImageUrl = pages[currentPage]?.image_urls.large || illust.image_urls.large;
   const isMultiPage = pages.length > 1;
+  const isUgoira = illust.type === 'ugoira';
+
+  // Determine image viewer based on type
+  const renderImageViewer = () => {
+    const imageSrc = proxyImageUrl(currentImageUrl);
+    // Log for debugging GIF URLs
+    console.log('[ImageDetail] currentImageUrl:', currentImageUrl);
+    console.log('[ImageDetail] isUgoira:', isUgoira, 'type:', illust.type);
+    // For Ugoira: we need to handle the animation differently
+    // Pixiv's ugoira uses ZIP files with frames, not GIF files
+    if (isUgoira) {
+      return <UgoiraViewer illustId={illust.id} src={imageSrc} alt={`${illust.title} - ${currentPage + 1}`} />;
+    }
+    // Use SimpleImage for normal images - fits without zoom
+    return <SimpleImage src={imageSrc} alt={`${illust.title} - ${currentPage + 1}`} />;
+  };
+
+  // Check if this is a GIF format image (for label display)
+  const isGifImage = currentImageUrl.toLowerCase().endsWith('.gif') || isUgoira;
 
   return (
     <div className="h-screen bg-black flex flex-col">
@@ -189,13 +216,9 @@ export function ImageDetail() {
         </div>
       </div>
 
-      {/* Image — key forces zoom reset on page change */}
+      {/* Image — key forces reset on page change */}
       <div className="flex-1 flex items-center justify-center overflow-hidden relative">
-        <ImageViewer
-          key={`${id}-${currentPage}`}
-          src={proxyImageUrl(currentImageUrl)}
-          alt={`${illust.title} - ${currentPage + 1}`}
-        />
+        {renderImageViewer()}
 
         {isMultiPage && (
           <>
@@ -265,6 +288,18 @@ export function ImageDetail() {
           <span className="text-gray-300 group-hover:text-white transition-colors">{illust.user.name}</span>
         </Link>
         <div className="flex flex-wrap gap-2 mt-3">
+          {illust.illust_ai_type === 2 && (
+            <span className="px-2 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs rounded font-medium flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              AI
+            </span>
+          )}
+          {isGifImage && (
+            <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-teal-600 text-white text-xs rounded font-medium flex items-center gap-1">
+              <Film className="w-3 h-3" />
+              GIF
+            </span>
+          )}
           {illust.tags.map((tag) => (
             <Link
               key={tag.name}

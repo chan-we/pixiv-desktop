@@ -14,6 +14,8 @@ export interface Illust {
   id: number;
   title: string;
   type: 'illust' | 'manga' | 'ugoira';
+  illust_ai_type?: 1 | 2; // 1=human, 2=AI generated
+  illust_type?: number; // 2=ugoira (from web API)
   image_urls: {
     square_medium: string;
     medium: string;
@@ -125,4 +127,30 @@ export interface AccessTokenResponse {
 export interface AuthCodeResponse {
   code: string;
   code_verifier: string;
+}
+
+export interface UgoiraMetadataResponse {
+  ugoira_metadata: {
+    zip_urls: {
+      medium: string;
+    };
+    frames: Array<{
+      file: string;
+      delay: number;
+    }>;
+  };
+}
+
+// Store extracted ugoira frames for playback
+export interface UgoiraFrame {
+  file: string;
+  delay: number;
+  dataUrl?: string;
+}
+
+export interface UgoiraData {
+  illustId: number;
+  zipUrl: string;
+  frames: UgoiraFrame[];
+  currentIndex: number;
 }

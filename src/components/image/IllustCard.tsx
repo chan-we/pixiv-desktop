@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Images, Heart } from 'lucide-react';
+import { Images, Heart, Sparkles, Film } from 'lucide-react';
 import { pixivApi } from '@/services/api/pixiv';
 import { proxyImageUrl } from '@/utils/image';
 import type { Illust } from '@/types';
@@ -13,6 +13,9 @@ interface IllustCardProps {
 export function IllustCard({ illust, rank }: IllustCardProps) {
   const [bookmarked, setBookmarked] = useState(illust.is_bookmarked);
   const [pending, setPending] = useState(false);
+
+  // Pixiv-Shaft uses isGif() which checks type === 'ugoira'
+  const isGif = illust.type === 'ugoira';
 
   const handleToggleBookmark = useCallback(
     async (e: React.MouseEvent) => {
@@ -60,6 +63,21 @@ export function IllustCard({ illust, rank }: IllustCardProps) {
           <p className="text-gray-300 text-xs truncate">{illust.user.name}</p>
         </div>
       </div>
+
+      {illust.illust_ai_type === 2 && (
+        <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+          <Sparkles className="w-3 h-3" />
+          AI
+        </div>
+      )}
+
+      {/* GIF badge - Pixiv-Shaft uses isGif() which checks type === 'ugoira' */}
+      {isGif && (
+        <div className="absolute top-2 left-12 bg-gradient-to-r from-green-600 to-teal-600 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+          <Film className="w-3 h-3" />
+          GIF
+        </div>
+      )}
 
       {illust.page_count > 1 && (
         <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
