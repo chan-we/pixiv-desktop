@@ -69,9 +69,9 @@ jobs:
           cache: pnpm
 
       - name: Install frontend dependencies
-        env:
-          PNPM_APPROVE_BUILDS: esbuild
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm config set approve-builds esbuild --location project
+          pnpm install --frozen-lockfile
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
