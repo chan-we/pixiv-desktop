@@ -70,7 +70,7 @@ jobs:
 
       - name: Install frontend dependencies
         run: |
-          echo 'esbuild' | pnpm approve-builds
+          pnpm config set approve-builds esbuild --global
           pnpm install --frozen-lockfile
 
       - name: Install Linux system dependencies
